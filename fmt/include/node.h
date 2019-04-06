@@ -4,25 +4,32 @@
 #include <openrave/openrave.h>
 
 #include <vector>
+#include <sstream>
 
 using OpenRAVE::dReal;
+using config_t = std::vector<dReal>;
 
-typedef std::vector<dReal> config_t;
+class Node;
+using nodeptr_t = std::shared_ptr<Node>;
 
 class Node
 {
 public:
-    double cost;
     config_t q;
-    std::shared_ptr<Node> parent;
+    nodeptr_t parent;
+    double cost;
 
 public:
-    Node(config_t config) : q(config), cost(0.0) {};
+    Node(config_t &config, double c = 0.0) : q(config), cost(c) {};
 
-    void SetParent(std::shared_ptr<Node>& p)
+    Node(config_t &config, nodeptr_t &parent, double c = 0.0);
+
+    void SetParent(nodeptr_t& p)
     { 
         parent = p;
     }
+
+    friend std::ostream& operator<<(std::ostream& os, const Node& node);
 };
 
 #endif

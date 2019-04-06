@@ -16,15 +16,15 @@
 #include <openrave/plannerparameters.h>
 #include <openrave/planningutils.h>
 
-
 #include <fmt.h>
-
 
 using namespace OpenRAVE;
 
 class FMT : public ModuleBase
 {
-    int N;              // Number of samples
+    size_t N;              // Number of samples
+    size_t dim;
+
     std::vector<dReal> startConfig;
     std::vector<dReal> goalConfig;
     std::vector<std::vector<dReal>> world;
@@ -34,8 +34,9 @@ class FMT : public ModuleBase
 
     nodes_t closed;
     nodes_t unvisited;
-    std::priority_queue<nodeptr_t, nodes_t, NodeComparator> open; 
+    std::priority_queue<nodeptr_t, nodes_t, NodeComparator> open;
 
+    Tree tree;
 
 public:
     FMT(EnvironmentBasePtr penv, std::istream &ss); 
@@ -53,6 +54,10 @@ public:
     bool SetNumSamples(std::ostream &sout, std::istream &sinput);
 
     bool PrintClass(std::ostream &sout, std::istream &sinput);
+
+    bool Run(std::ostream &sout, std::istream &sinput);
+
+    void TestOpenSet();
 
 };
 
@@ -79,6 +84,8 @@ OPENRAVE_PLUGIN_API void DestroyPlugin() { }
 
 FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
 : ModuleBase(penv)
+, N(0.0)
+, dim(0)
 {
     RegisterCommand("Init", boost::bind(&FMT::Init, this, _1, _2),
                     "Initializes the Planner");
@@ -92,6 +99,8 @@ FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
                     "Sets the number of samples to be used by planner");
     RegisterCommand("PrintClass", boost::bind(&FMT::PrintClass, this, _1, _2),
                     "Prints the member variables of FMT");
+    RegisterCommand("Run", boost::bind(&FMT::Run, this, _1, _2),
+                    "Run FMT planner");
 }
 
 bool FMT::Init(std::ostream &sout, std::istream &sinput)
@@ -135,6 +144,8 @@ bool FMT::DefineWorld(std::ostream &sout, std::istream &sinput)
         world.push_back(limits);
     }
 
+    dim = world[0].size();
+
     // Setup random number generators for sampling
     for (unsigned i = 0; i < world.size(); ++i)
     {
@@ -149,6 +160,9 @@ bool FMT::SetNumSamples(std::ostream &sout, std::istream &sinput)
     std::string numSamples;
     sinput >> numSamples;
     N = atof(numSamples.c_str());
+
+    tree.Reserve(N);
+
     return true;
 }
 
@@ -165,5 +179,43 @@ bool FMT::PrintClass(std::ostream &sout, std::istream &sinput)
     std::cout << "Start: "; printVector(startConfig);
     std::cout << "Goal:  "; printVector(goalConfig);
 
+    return true;
+}
+
+void FMT::TestOpenSet()
+{
+    const size_t numNodes = 5;
+    
+    // Add the start node to the tree
+    nodeptr_t noParent;
+    tree.AddNode(startConfig, noParent);
+
+    for (size_t i = 0; i < numNodes; ++i)
+    {
+        config_t q;
+        for (size_t j = 0; j < dim; ++j)
+        {
+            q.push_back(dists[j](gen));
+        }
+        nodeptr_t node = std::make_shared<Node>(q, noParent);
+        tree.AddNode(node);
+        
+        node->cost = numNodes-i;
+        open.push(node);
+    }
+
+    tree.PrintNodes();
+
+    std::cout << "\nNodes in Open Set:\n";
+    for (size_t i = 0; i < numNodes; ++i)
+    {
+        std::cout << *open.top();
+        open.pop();
+    }
+}
+
+bool FMT::Run(std::ostream &sout, std::istream &sinput)
+{
+    TestOpenSet();
     return true;
 }

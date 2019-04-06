@@ -74,7 +74,8 @@ if __name__ == "__main__":
         FMTPlanner.SendCommand('SetGoal ' + goalConfigStr)
         FMTPlanner.SendCommand('DefineWorld ' + worldStr)
         FMTPlanner.SendCommand('SetNumSamples ' + str(SAMPLES))
-        FMTPlanner.SendCommand('PrintClass')
+        # FMTPlanner.SendCommand('PrintClass')
+        FMTPlanner.SendCommand('Run')
         
     waitrobot(robot)
 

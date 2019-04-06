@@ -7,7 +7,7 @@
 template<class T>
 inline void printVector(std::vector<T> &vec)
 {
-    for (auto val : vec) 
+    for (auto & val : vec) 
     {
         std::cout << val << " ";
     }
