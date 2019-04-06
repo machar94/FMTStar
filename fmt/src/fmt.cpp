@@ -1,4 +1,24 @@
+#include <iostream>
+#include <cmath>
+#include <vector>
+#include <algorithm>
+#include <math.h>
+#include <random>
+#include <time.h>
+#include <chrono>
+#include <memory>
+#include <queue>
+
+#include <openrave/openrave.h>
+#include <openrave-core.h>
+#include <openrave/plugin.h>
+#include <boost/bind.hpp>
+#include <openrave/plannerparameters.h>
+#include <openrave/planningutils.h>
+
+
 #include <fmt.h>
+
 
 using namespace OpenRAVE;
 
@@ -11,6 +31,10 @@ class FMT : public ModuleBase
 
     std::mt19937 gen;   // random number generator
     std::vector<std::uniform_real_distribution<dReal>> dists;
+
+    nodes_t closed;
+    nodes_t unvisited;
+    std::priority_queue<nodeptr_t, nodes_t, NodeComparator> open; 
 
 
 public:

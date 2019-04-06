@@ -14,4 +14,4 @@ inline void printVector(std::vector<T> &vec)
     std::cout << std::endl;
 }
 
-#endif HELPER_HPP
+#endif 
