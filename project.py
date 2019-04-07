@@ -9,8 +9,8 @@ import os
 
 ##### Parameters #####
 WORLD    = [-3.4, 3.4, -1.4, 1.4]
-SAMPLES  = 200  
-RADIUS   = 1.0
+SAMPLES  = 400  
+RADIUS   = 0.5
 STEPSIZE = 0.1
 
 if not __openravepy_build_doc__:

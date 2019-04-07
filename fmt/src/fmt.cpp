@@ -528,7 +528,7 @@ void FMT::ExecuteTrajectory(path_t &path)
     traj->Init(robot->GetActiveConfigurationSpecification());
 
     int i = 0;
-    for (auto it = path.rbegin(); it != path.rend(); ++it)
+    for (auto it = path.begin(); it != path.end(); ++it)
     {
         traj->Insert(i, *it);
         i++;
