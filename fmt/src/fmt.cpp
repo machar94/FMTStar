@@ -2,6 +2,7 @@
 #include <time.h>
 #include <chrono>
 #include <queue>
+#include <limits>
 
 #include <openrave-core.h>
 #include <openrave/plugin.h>
@@ -15,9 +16,9 @@ using namespace OpenRAVE;
 
 class FMT : public ModuleBase
 {
-    size_t N;       // Number of samples
+    size_t N; // Number of samples
     size_t dim;
-    double radius;  // Radius for nearest neighbor search
+    double radius; // Radius for nearest neighbor search
 
     std::vector<dReal> startConfig;
     std::vector<dReal> goalConfig;
@@ -28,23 +29,24 @@ class FMT : public ModuleBase
 
     nodes_t closed;
     nodes_t unvisited;
-    nodes_t total;  // total = open + closed + unvisited
+    nodes_t total; // total = open + closed + unvisited
 
     class OpenSet
     {
         std::priority_queue<nodeptr_t, nodes_t, NodeComparator> open;
-        public:
-            void push(nodeptr_t &node) 
-            {
-                node->setType = OPEN;
-                open.push(node);
-            }
 
-            const nodeptr_t& top() { return open.top(); }
+      public:
+        void push(nodeptr_t &node)
+        {
+            node->setType = OPEN;
+            open.push(node);
+        }
 
-            void pop() { open.pop(); }
+        const nodeptr_t &top() { return open.top(); }
 
-            size_t size() const { return open.size(); }
+        void pop() { open.pop(); }
+
+        size_t size() const { return open.size(); }
     };
     OpenSet open;
 
@@ -88,8 +90,12 @@ class FMT : public ModuleBase
 
     bool CheckCollision(const config_t &config) const;
 
+    nodeptr_t FindClosestNodeInOpen(
+        const nodes_t &nodes,
+        const nodeptr_t &curr) const;
+
     /* Testing Functionality */
-    
+
     // Tests to see if min heap is working correctly
     void TestOpenSet();
 
@@ -269,20 +275,20 @@ void FMT::TestOpenSet()
 
 bool FMT::Run(std::ostream &sout, std::istream &sinput)
 {
-    // Initialize and set the open, unvisited and closed sets 
+    // Initialize and set the open, unvisited and closed sets
     SetupSets();
 
     // Set init to the current node
     currNode = open.top();
 
     // Find the nearest neighbors within radius
-    nodes_t currNN;
 
     while (currNode->q != goalConfig)
     {
         nodes_t open_new;
-        
+
         // Other than start config, should always find neighbors through table
+        nodes_t currNN;
         findNearestNeighbors(total, currNN, currNode, radius, neighborTable);
 
         // Only perform wiring for nodes in unvisited set
@@ -294,13 +300,10 @@ bool FMT::Run(std::ostream &sout, std::istream &sinput)
             }
 
             nodes_t xNN; // Neighbor x's nearest neighbors
-            findNearestNeighbors(total, xNN, currNN[i], radius, neighborTable);
+            FindNearestNeighbors(total, xNN, currNN[i], radius, neighborTable);
 
-            nodes_t yNear;
-
+            nodeptr_t yMin = FindClosestNodeInOpen(xNN, currNN[i]);
         }
-
-
     }
 
     return true;
@@ -365,4 +368,30 @@ void FMT::TestSetSizes()
     std::cout << "ClosedSet: " << closed.size() << std::endl;
     std::cout << "Unvisited: " << unvisited.size() << std::endl;
     std::cout << "Total    : " << total.size() << std::endl;
+}
+
+nodeptr_t FMT::FindClosestNodeInOpen(
+    const nodes_t &nodes,
+    const nodeptr_t &curr) const
+{
+    double minCost = std::numeric_limits<double>::max();
+    nodeptr_t closestNode;
+
+    for (const auto &node : nodes)
+    {
+        if (node->setType != OPEN)
+        {
+            continue;
+        }
+
+        double cost = CalcEuclidianDist(node, curr);
+        // Node represents y's cost to come in tree 
+        if ((cost + node->cost) < minCost)
+        {
+            minCost = cost + node->cost;
+            closestNode = node;
+        }
+    }
+
+    return closestNode;
 }

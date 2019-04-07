@@ -12,6 +12,11 @@ inline void printVector(std::vector<T> &vec)
     std::cout << std::endl;
 }
 
+double CalcEuclidianDist(const nodeptr_t &n1, const nodeptr_t &n2)
+{
+    return CalcEuclidianDist(n1->q, n2->q);
+}
+
 double CalcEuclidianDist(const config_t &q1, const config_t &q2)
 {
     double sum = 0.0;
@@ -22,7 +27,7 @@ double CalcEuclidianDist(const config_t &q1, const config_t &q2)
     return sqrtf(sum);
 }
 
-void findNearestNeighbors(
+void FindNearestNeighbors(
     nodes_t &set,
     nodes_t &neighbors,
     nodeptr_t &curr,

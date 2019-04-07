@@ -18,6 +18,8 @@ void findNearestNeighbors(
     double radius,
     std::unordered_map<nodeptr_t, nodes_t> &neighborTable);
 
+double CalcEuclidianDist(const nodeptr_t &q1, const nodeptr_t &q2);
+
 double CalcEuclidianDist(const config_t &q1, const config_t &q2);
 
 #endif
