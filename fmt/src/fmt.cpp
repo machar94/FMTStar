@@ -50,6 +50,7 @@ class FMT : public ModuleBase
 
         size_t size() const { return open.size(); }
     };
+
     OpenSet open;
 
     Tree tree;
@@ -103,6 +104,8 @@ class FMT : public ModuleBase
 
     // Checks to see if the path from n1 to n2 is collision free
     bool CollisionFree(nodeptr_t &n1, nodeptr_t &n2);
+
+    bool FindPath();
 
     /* Testing Functionality */
 
@@ -299,41 +302,9 @@ bool FMT::Run(std::ostream &sout, std::istream &sinput)
     // Initialize and set the open, unvisited and closed sets
     SetupSets();
 
-    // Set init to the current node
-    currNode = open.top();
+    bool isSolved = FindPath();
 
-    // Find the nearest neighbors within radius
-
-    while (currNode->q != goalConfig)
-    {
-        nodes_t open_new;
-
-        // Other than start config, should always find neighbors through table
-        nodes_t currNN;
-        FindNearestNeighbors(total, currNN, currNode, radius, neighborTable);
-
-        // Only perform wiring for nodes in unvisited set
-        for (size_t i = 0; i < currNN.size(); ++i)
-        {
-            if (currNN[i]->setType != UNVISITED)
-            {
-                continue;
-            }
-
-            nodes_t xNN; // Neighbor x's nearest neighbors
-            FindNearestNeighbors(total, xNN, currNN[i], radius, neighborTable);
-
-            nodeptr_t yMin = FindClosestNodeInOpen(xNN, currNN[i]);
-
-            if (CollisionFree(yMin, currNN[i]))
-            {
-                // Add node x to tree and add its parent is yMin
-                // Add node x to the open_new set // wait to change to open
-                // Remove node x from unvisited and change to open
-                // ypdate cost of node x (y->x) + cost(y)
-            }
-        }
-    }
+    // Plotting stuff here
 
     return true;
 }
@@ -444,4 +415,66 @@ bool FMT::CollisionFree(nodeptr_t &n1, nodeptr_t &n2)
             return false;
         }
     }
+}
+
+bool FMT::FindPath()
+{
+    // Set init to the current node
+    currNode = open.top();
+
+    while (currNode->q != goalConfig)
+    {
+        nodes_t open_new;
+
+        // Other than start config, should always find neighbors through table
+        nodes_t currNN;
+        FindNearestNeighbors(total, currNN, currNode, radius, neighborTable);
+
+        // Only perform wiring for nodes in unvisited set
+        for (size_t i = 0; i < currNN.size(); ++i)
+        {
+            if (currNN[i]->setType != UNVISITED)
+            {
+                continue;
+            }
+
+            nodes_t xNN; // Neighbor x's nearest neighbors
+            FindNearestNeighbors(total, xNN, currNN[i], radius, neighborTable);
+
+            nodeptr_t yMin = FindClosestNodeInOpen(xNN, currNN[i]);
+
+            if (CollisionFree(yMin, currNN[i]))
+            {
+                // Add node x to tree and add its parent is yMin
+                currNN[i]->parent = yMin;
+                tree.AddNode(currNN[i]);
+                
+                // Add node x to the open_new set
+                // Wait to change to open
+                open_new.push_back(currNN[i]);
+
+                // Remove node x from unvisited and change to open
+                auto it = std::remove(unvisited.begin(), unvisited.end(), currNN[i]);
+                unvisited.erase(it, unvisited.end());
+    
+                // Update cost of node x (y->x) + cost(y)
+                currNN[i]->cost = yMin->cost + CalcEuclidianDist(yMin, currNN[i]);
+            }
+        }
+
+        // Update open list: (Vopen U Vopen_new) \ {z}
+        open.pop();
+        for (auto &node : open_new)
+        {
+            open.push(node);
+        }
+
+        if (open.size() == 0)
+        {
+            return false;
+        }
+        currNode = open.top();
+    }
+
+    return true;
 }
