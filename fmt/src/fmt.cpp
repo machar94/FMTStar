@@ -7,6 +7,7 @@
 #include <openrave-core.h>
 #include <openrave/plugin.h>
 #include <boost/bind.hpp>
+#include <boost/functional/hash.hpp>
 #include <openrave/plannerparameters.h>
 #include <openrave/planningutils.h>
 
@@ -19,6 +20,7 @@ class FMT : public ModuleBase
     size_t N; // Number of samples
     size_t dim;
     double radius; // Radius for nearest neighbor search
+    double stepSize;
 
     std::vector<dReal> startConfig;
     std::vector<dReal> goalConfig;
@@ -74,6 +76,8 @@ class FMT : public ModuleBase
 
     bool SetRadius(std::ostream &sout, std::istream &sinput);
 
+    bool SetStepSize(std::ostream &sout, std::istream &sinput);
+
     bool PrintClass(std::ostream &sout, std::istream &sinput);
 
     bool Run(std::ostream &sout, std::istream &sinput);
@@ -88,11 +92,17 @@ class FMT : public ModuleBase
     // Addes N-1 samples (including goal config) to unvisited set
     void GenerateSamples();
 
+    // Checks if a configuration is valid
     bool CheckCollision(const config_t &config) const;
 
+    // Returns the closest node in open. This should always return a valid node
+    // as the node used to generate curr was originally in the open set
     nodeptr_t FindClosestNodeInOpen(
         const nodes_t &nodes,
         const nodeptr_t &curr) const;
+
+    // Checks to see if the path from n1 to n2 is collision free
+    bool CollisionFree(nodeptr_t &n1, nodeptr_t &n2);
 
     /* Testing Functionality */
 
@@ -124,7 +134,7 @@ void GetPluginAttributesValidated(PLUGININFO &info)
 OPENRAVE_PLUGIN_API void DestroyPlugin() {}
 
 FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
-    : ModuleBase(penv), N(0.0), dim(0)
+    : ModuleBase(penv), N(0.0), dim(0), stepSize(0.1)
 {
     RegisterCommand("Init", boost::bind(&FMT::Init, this, _1, _2),
                     "Initializes the Planner");
@@ -138,6 +148,8 @@ FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
                     "Sets the number of samples to be used by planner");
     RegisterCommand("SetRadius", boost::bind(&FMT::SetRadius, this, _1, _2),
                     "Sets the radius used by nearest neighbors");
+    RegisterCommand("SetStepSize", boost::bind(&FMT::SetStepSize, this, _1, _2),
+                    "Sets the step size to be used in collision checking");
     RegisterCommand("PrintClass", boost::bind(&FMT::PrintClass, this, _1, _2),
                     "Prints the member variables of FMT");
     RegisterCommand("Run", boost::bind(&FMT::Run, this, _1, _2),
@@ -220,6 +232,15 @@ bool FMT::SetRadius(std::ostream &sout, std::istream &sinput)
     return true;
 }
 
+bool FMT::SetStepSize(std::ostream &sout, std::istream &sinput)
+{
+    std::string val;
+    sinput >> val;
+    stepSize = atof(val.c_str());
+
+    return true;
+}
+
 bool FMT::PrintClass(std::ostream &sout, std::istream &sinput)
 {
     std::cout << "\n---- FMT Class Values ----\n";
@@ -289,7 +310,7 @@ bool FMT::Run(std::ostream &sout, std::istream &sinput)
 
         // Other than start config, should always find neighbors through table
         nodes_t currNN;
-        findNearestNeighbors(total, currNN, currNode, radius, neighborTable);
+        FindNearestNeighbors(total, currNN, currNode, radius, neighborTable);
 
         // Only perform wiring for nodes in unvisited set
         for (size_t i = 0; i < currNN.size(); ++i)
@@ -303,6 +324,14 @@ bool FMT::Run(std::ostream &sout, std::istream &sinput)
             FindNearestNeighbors(total, xNN, currNN[i], radius, neighborTable);
 
             nodeptr_t yMin = FindClosestNodeInOpen(xNN, currNN[i]);
+
+            if (CollisionFree(yMin, currNN[i]))
+            {
+                // Add node x to tree and add its parent is yMin
+                // Add node x to the open_new set // wait to change to open
+                // Remove node x from unvisited and change to open
+                // ypdate cost of node x (y->x) + cost(y)
+            }
         }
     }
 
@@ -385,7 +414,7 @@ nodeptr_t FMT::FindClosestNodeInOpen(
         }
 
         double cost = CalcEuclidianDist(node, curr);
-        // Node represents y's cost to come in tree 
+        // Node represents y's cost to come in tree
         if ((cost + node->cost) < minCost)
         {
             minCost = cost + node->cost;
@@ -394,4 +423,25 @@ nodeptr_t FMT::FindClosestNodeInOpen(
     }
 
     return closestNode;
+}
+
+bool FMT::CollisionFree(nodeptr_t &n1, nodeptr_t &n2)
+{
+    config_t q1 = n1->q, q2 = n2->q;
+    auto dir = CalcDirVector(q1, q2, stepSize);
+
+    while (true)
+    {
+        double dist = CalcEuclidianDist(q1, q2);
+        if (dist < stepSize)
+        {
+            return true;
+        }
+
+        q1 = q1 + dir;
+        if (CheckCollision(q1))
+        {
+            return false;
+        }
+    }
 }

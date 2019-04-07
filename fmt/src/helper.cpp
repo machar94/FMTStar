@@ -55,3 +55,28 @@ void FindNearestNeighbors(
         neighborTable.emplace(curr, neighbors);
     }
 }
+
+std::vector<dReal> CalcDirVector(
+    const config_t &v1, 
+    const config_t &v2,
+    double stepSize)
+{
+    std::vector<dReal> dir(v2.size(), 0.0);
+    double dist = CalcEuclidianDist(v1, v2);
+
+    for (size_t i = 0; i < v2.size(); ++i)
+    {
+        dir[i] = (v2[i] - v1[i]) / dist * stepSize;
+    }
+    return dir;
+}
+
+config_t operator+(const config_t &v1, const config_t &v2)
+{
+    config_t v3(v1.size(), 0.0);
+    for (size_t i = 0; i < v1.size(); ++i)
+    {
+        v3[i] = v1[i] + v2[i];
+    }
+    return v3;
+}

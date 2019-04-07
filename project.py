@@ -8,9 +8,10 @@ import matplotlib.pyplot as plt
 import os
 
 ##### Parameters #####
-WORLD   = [-3.4, 3.4, -1.4, 1.4]
-SAMPLES = 200  
-RADIUS  = 1.0
+WORLD    = [-3.4, 3.4, -1.4, 1.4]
+SAMPLES  = 200  
+RADIUS   = 1.0
+STEPSIZE = 0.1
 
 if not __openravepy_build_doc__:
     from openravepy import *
@@ -76,6 +77,7 @@ if __name__ == "__main__":
         FMTPlanner.SendCommand('DefineWorld ' + worldStr)
         FMTPlanner.SendCommand('SetNumSamples ' + str(SAMPLES))
         FMTPlanner.SendCommand('SetRadius ' + str(RADIUS)) 
+        FMTPlanner.SendCommand('SetStepSize ' + str(STEPSIZE)) 
         # FMTPlanner.SendCommand('PrintClass')
         FMTPlanner.SendCommand('Run')
         
