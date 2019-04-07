@@ -25,6 +25,7 @@ class FMT : public ModuleBase
     std::vector<dReal> startConfig;
     std::vector<dReal> goalConfig;
     std::vector<std::vector<dReal>> world;
+    nodeptr_t goalNode;
 
     std::mt19937 gen; // random number generator
     std::vector<std::uniform_real_distribution<dReal>> dists;
@@ -33,6 +34,9 @@ class FMT : public ModuleBase
     nodes_t unvisited;
     nodes_t total; // total = open + closed + unvisited
 
+    // Handle to all of the points being plotted
+    std::vector<GraphHandlePtr> ghandle;
+    
     class OpenSet
     {
         std::priority_queue<nodeptr_t, nodes_t, NodeComparator> open;
@@ -107,6 +111,11 @@ class FMT : public ModuleBase
 
     bool FindPath();
 
+    path_t BuildPath();
+
+    void PlotPath(const float color[4], path_t &path);
+    
+    void ExecuteTrajectory(path_t &path);
     /* Testing Functionality */
 
     // Tests to see if min heap is working correctly
@@ -304,7 +313,11 @@ bool FMT::Run(std::ostream &sout, std::istream &sinput)
 
     bool isSolved = FindPath();
 
-    // Plotting stuff here
+    path_t path = BuildPath();
+
+    PlotPath(red, path);
+
+    ExecuteTrajectory(path);
 
     return true;
 }
@@ -476,5 +489,52 @@ bool FMT::FindPath()
         currNode = open.top();
     }
 
+    goalNode = currNode;
+
     return true;
+}
+
+path_t FMT::BuildPath()
+{
+    path_t path;
+    nodeptr_t currNode = goalNode;
+
+    while(currNode.get())
+    {
+        path.push_back(currNode->q);
+        currNode = currNode->parent;
+    }
+
+    return path;
+}
+
+void FMT::PlotPath(const float color[4], path_t &path)
+{
+    std::vector<float> p(3, 0.05);
+    for (auto it = path.rbegin(); it != path.rend(); ++it)
+    {
+        p[0] = (*it)[0]; 
+        p[1] = (*it)[1];
+        ghandle.push_back(GetEnv()->plot3(&p[0], 1, 12, 5, color, 0));
+
+    }
+}
+
+void FMT::ExecuteTrajectory(path_t &path)
+{
+    robot->SetActiveDOFValues(startConfig);
+
+    TrajectoryBasePtr traj = RaveCreateTrajectory(GetEnv(), "");
+    traj->Init(robot->GetActiveConfigurationSpecification());
+
+    int i = 0;
+    for (auto it = path.rbegin(); it != path.rend(); ++it)
+    {
+        traj->Insert(i, *it);
+        i++;
+    }
+    std::vector<double> maxVel(2, 1.0);
+    std::vector<double> maxAcc(2, 5.0);
+    OpenRAVE::planningutils::RetimeAffineTrajectory(traj, maxVel, maxAcc);
+    robot->GetController()->SetPath(traj);
 }
