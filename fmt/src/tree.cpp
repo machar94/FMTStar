@@ -11,14 +11,6 @@ void Tree::AddNode(nodeptr_t &node)
     nodes.push_back(node);
 }
 
-void Tree::AddNode(config_t &q, nodeptr_t &parent)
-{
-    nodeptr_t nodeptr = std::make_shared<Node>(q);
-    nodeptr->parent = parent;
-
-    nodes.push_back(nodeptr);
-}
-
 void Tree::PrintNodes()
 {
     std::cout << "Nodes in Tree:" << std::endl;

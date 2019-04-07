@@ -29,7 +29,24 @@ class FMT : public ModuleBase
     nodes_t closed;
     nodes_t unvisited;
     nodes_t total;  // total = open + closed + unvisited
-    std::priority_queue<nodeptr_t, nodes_t, NodeComparator> open;
+
+    class OpenSet
+    {
+        std::priority_queue<nodeptr_t, nodes_t, NodeComparator> open;
+        public:
+            void push(nodeptr_t &node) 
+            {
+                node->setType = OPEN;
+                open.push(node);
+            }
+
+            const nodeptr_t& top() { return open.top(); }
+
+            void pop() { open.pop(); }
+
+            size_t size() const { return open.size(); }
+    };
+    OpenSet open;
 
     Tree tree;
     RobotBasePtr robot;
@@ -72,8 +89,11 @@ class FMT : public ModuleBase
     bool CheckCollision(const config_t &config) const;
 
     /* Testing Functionality */
+    
+    // Tests to see if min heap is working correctly
     void TestOpenSet();
 
+    // Tests to see the size of each set (total, open, closed, unvisted)
     void TestSetSizes();
 };
 
@@ -217,9 +237,11 @@ void FMT::TestOpenSet()
 {
     const size_t numNodes = 5;
 
-    // Add the start node to the tree
     nodeptr_t noParent;
-    tree.AddNode(startConfig, noParent);
+    nodeptr_t node = std::make_shared<Node>(startConfig, noParent);
+
+    // Add the start node to the tree
+    tree.AddNode(node);
 
     for (size_t i = 0; i < numNodes; ++i)
     {
@@ -228,7 +250,7 @@ void FMT::TestOpenSet()
         {
             q.push_back(dists[j](gen));
         }
-        nodeptr_t node = std::make_shared<Node>(q, noParent);
+        node = std::make_shared<Node>(q, noParent);
         tree.AddNode(node);
 
         node->cost = numNodes - i;
@@ -254,8 +276,32 @@ bool FMT::Run(std::ostream &sout, std::istream &sinput)
     currNode = open.top();
 
     // Find the nearest neighbors within radius
-    nodes_t neighbors;
-    findNearestNeighbors(total, neighbors, currNode, radius, neighborTable);
+    nodes_t currNN;
+
+    while (currNode->q != goalConfig)
+    {
+        nodes_t open_new;
+        
+        // Other than start config, should always find neighbors through table
+        findNearestNeighbors(total, currNN, currNode, radius, neighborTable);
+
+        // Only perform wiring for nodes in unvisited set
+        for (size_t i = 0; i < currNN.size(); ++i)
+        {
+            if (currNN[i]->setType != UNVISITED)
+            {
+                continue;
+            }
+
+            nodes_t xNN; // Neighbor x's nearest neighbors
+            findNearestNeighbors(total, xNN, currNN[i], radius, neighborTable);
+
+            nodes_t yNear;
+
+        }
+
+
+    }
 
     return true;
 }
@@ -293,12 +339,12 @@ void FMT::GenerateSamples()
         } while (CheckCollision(config));
 
         // Create node and push it on to the unvisited nodes list
-        nodeptr_t nodeptr = std::make_shared<Node>(config);
+        nodeptr_t nodeptr = std::make_shared<Node>(config, UNVISITED);
         unvisited.push_back(nodeptr);
     }
 
     // Goal configuration needs to be in free space
-    nodeptr_t nodeptr = std::make_shared<Node>(goalConfig);
+    nodeptr_t nodeptr = std::make_shared<Node>(goalConfig, UNVISITED);
     unvisited.push_back(nodeptr);
 }
 

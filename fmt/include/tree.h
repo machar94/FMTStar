@@ -20,8 +20,6 @@ class Tree
 
     void AddNode(nodeptr_t &node);
 
-    void AddNode(config_t &q, nodeptr_t &parent);
-
     void PrintNodes();
 };
 

@@ -12,17 +12,26 @@ using config_t = std::vector<dReal>;
 class Node;
 using nodeptr_t = std::shared_ptr<Node>;
 
+enum SetType
+{
+    OPEN,
+    UNVISITED,
+    CLOSED,
+    INVALID
+};
+
 class Node
 {
   public:
-    config_t q;
+    config_t  q;
     nodeptr_t parent;
-    double cost;
+    SetType   setType;
+    double    cost;
 
   public:
-    Node(config_t &config, double c = 0.0) : q(config), cost(c){};
+    Node(config_t &config, SetType t = INVALID, double c = 0.0); 
 
-    Node(config_t &config, nodeptr_t &parent, double c = 0.0);
+    Node(config_t &config, nodeptr_t &parent, SetType t = INVALID, double c = 0.0);
 
     void SetParent(nodeptr_t &p)
     {
