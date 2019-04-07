@@ -1,15 +1,8 @@
-#include <iostream>
-#include <cmath>
-#include <vector>
-#include <algorithm>
-#include <math.h>
 #include <random>
 #include <time.h>
 #include <chrono>
-#include <memory>
 #include <queue>
 
-#include <openrave/openrave.h>
 #include <openrave-core.h>
 #include <openrave/plugin.h>
 #include <boost/bind.hpp>
@@ -22,25 +15,32 @@ using namespace OpenRAVE;
 
 class FMT : public ModuleBase
 {
-    size_t N;              // Number of samples
+    size_t N;       // Number of samples
     size_t dim;
+    double radius;  // Radius for nearest neighbor search
 
     std::vector<dReal> startConfig;
     std::vector<dReal> goalConfig;
     std::vector<std::vector<dReal>> world;
 
-    std::mt19937 gen;   // random number generator
+    std::mt19937 gen; // random number generator
     std::vector<std::uniform_real_distribution<dReal>> dists;
 
     nodes_t closed;
     nodes_t unvisited;
+    nodes_t total;  // total = open + closed + unvisited
     std::priority_queue<nodeptr_t, nodes_t, NodeComparator> open;
 
     Tree tree;
+    RobotBasePtr robot;
 
-public:
-    FMT(EnvironmentBasePtr penv, std::istream &ss); 
-    
+    std::unordered_map<nodeptr_t, nodes_t> neighborTable;
+
+    nodeptr_t currNode;
+
+  public:
+    FMT(EnvironmentBasePtr penv, std::istream &ss);
+
     virtual ~FMT() {}
 
     bool Init(std::ostream &sout, std::istream &sinput);
@@ -53,12 +53,28 @@ public:
 
     bool SetNumSamples(std::ostream &sout, std::istream &sinput);
 
+    bool SetRadius(std::ostream &sout, std::istream &sinput);
+
     bool PrintClass(std::ostream &sout, std::istream &sinput);
 
     bool Run(std::ostream &sout, std::istream &sinput);
 
+  private:
+    // Initialize open, closed and unvisited sets
+    // 1. Open set should have only start
+    // 2. Closed set should be empty
+    // 3. Unvisited should have N-1 configs (goal + N-2 samples)
+    void SetupSets();
+
+    // Addes N-1 samples (including goal config) to unvisited set
+    void GenerateSamples();
+
+    bool CheckCollision(const config_t &config) const;
+
+    /* Testing Functionality */
     void TestOpenSet();
 
+    void TestSetSizes();
 };
 
 // Called to create a new plugin
@@ -72,7 +88,6 @@ InterfaceBasePtr CreateInterfaceValidated(InterfaceType type, const std::string 
     return InterfaceBasePtr();
 }
 
-
 // Called to query available plugins
 void GetPluginAttributesValidated(PLUGININFO &info)
 {
@@ -80,12 +95,10 @@ void GetPluginAttributesValidated(PLUGININFO &info)
 }
 
 // Called before plugin is terminated
-OPENRAVE_PLUGIN_API void DestroyPlugin() { }
+OPENRAVE_PLUGIN_API void DestroyPlugin() {}
 
 FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
-: ModuleBase(penv)
-, N(0.0)
-, dim(0)
+    : ModuleBase(penv), N(0.0), dim(0)
 {
     RegisterCommand("Init", boost::bind(&FMT::Init, this, _1, _2),
                     "Initializes the Planner");
@@ -97,6 +110,8 @@ FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
                     "Sets the lower and upper limits of the configuration space");
     RegisterCommand("SetNumSamples", boost::bind(&FMT::SetNumSamples, this, _1, _2),
                     "Sets the number of samples to be used by planner");
+    RegisterCommand("SetRadius", boost::bind(&FMT::SetRadius, this, _1, _2),
+                    "Sets the radius used by nearest neighbors");
     RegisterCommand("PrintClass", boost::bind(&FMT::PrintClass, this, _1, _2),
                     "Prints the member variables of FMT");
     RegisterCommand("Run", boost::bind(&FMT::Run, this, _1, _2),
@@ -107,9 +122,13 @@ bool FMT::Init(std::ostream &sout, std::istream &sinput)
 {
     std::cout << "Initializing FMT* Planner...\n";
 
+    std::vector<RobotBasePtr> vrobots;
+    GetEnv()->GetRobots(vrobots);
+    robot = vrobots.at(0);
+
     std::random_device rd;
     gen.seed(rd());
-    
+
     return true;
 }
 
@@ -166,18 +185,30 @@ bool FMT::SetNumSamples(std::ostream &sout, std::istream &sinput)
     return true;
 }
 
+bool FMT::SetRadius(std::ostream &sout, std::istream &sinput)
+{
+    std::string val;
+    sinput >> val;
+    radius = atof(val.c_str());
+
+    return true;
+}
+
 bool FMT::PrintClass(std::ostream &sout, std::istream &sinput)
 {
     std::cout << "\n---- FMT Class Values ----\n";
     std::cout << "Number of Samples: " << N << std::endl;
     std::cout << "World Config Space: " << std::endl;
-    for (auto & val: world)
+    for (auto &val : world)
     {
         std::cout << "\t";
         printVector(val);
     }
-    std::cout << "Start: "; printVector(startConfig);
-    std::cout << "Goal:  "; printVector(goalConfig);
+    std::cout << "Start: ";
+    printVector(startConfig);
+    std::cout << "Goal:  ";
+    printVector(goalConfig);
+    std::cout << "Radius: " << radius << std::endl;
 
     return true;
 }
@@ -185,7 +216,7 @@ bool FMT::PrintClass(std::ostream &sout, std::istream &sinput)
 void FMT::TestOpenSet()
 {
     const size_t numNodes = 5;
-    
+
     // Add the start node to the tree
     nodeptr_t noParent;
     tree.AddNode(startConfig, noParent);
@@ -199,8 +230,8 @@ void FMT::TestOpenSet()
         }
         nodeptr_t node = std::make_shared<Node>(q, noParent);
         tree.AddNode(node);
-        
-        node->cost = numNodes-i;
+
+        node->cost = numNodes - i;
         open.push(node);
     }
 
@@ -216,6 +247,76 @@ void FMT::TestOpenSet()
 
 bool FMT::Run(std::ostream &sout, std::istream &sinput)
 {
-    TestOpenSet();
+    // Initialize and set the open, unvisited and closed sets 
+    SetupSets();
+
+    // Set init to the current node
+    currNode = open.top();
+
+    // Find the nearest neighbors within radius
+    nodes_t neighbors;
+    findNearestNeighbors(total, neighbors, currNode, radius, neighborTable);
+
     return true;
+}
+
+void FMT::SetupSets()
+{
+    nodeptr_t nullParent;
+    nodeptr_t start = std::make_shared<Node>(startConfig, nullParent);
+    open.push(start);
+    tree.AddNode(start);
+
+    // Add valid configurations including goal to unvisited set
+    GenerateSamples();
+
+    // Total = open + unvisited + closed
+    total = unvisited;
+    total.push_back(start);
+}
+
+void FMT::GenerateSamples()
+{
+    // Generate N-2 random samples in configuration space and add to the
+    // unvistied set. Afterwards add the goal configuration to the set.
+    for (size_t i = 0; i < N - 2; ++i)
+    {
+        // Generate a valid configuration
+        config_t config(dim, 0.0);
+        do
+        {
+            for (size_t j = 0; j < dim; ++j)
+            {
+                config[j] = dists[j](gen);
+            }
+
+        } while (CheckCollision(config));
+
+        // Create node and push it on to the unvisited nodes list
+        nodeptr_t nodeptr = std::make_shared<Node>(config);
+        unvisited.push_back(nodeptr);
+    }
+
+    // Goal configuration needs to be in free space
+    nodeptr_t nodeptr = std::make_shared<Node>(goalConfig);
+    unvisited.push_back(nodeptr);
+}
+
+bool FMT::CheckCollision(const config_t &config) const
+{
+    robot->SetActiveDOFValues(config);
+
+    bool ret;
+    ret = GetEnv()->CheckCollision(RobotBaseConstPtr(robot));
+    ret = robot->CheckSelfCollision() || ret;
+    return ret;
+}
+
+void FMT::TestSetSizes()
+{
+    std::cout << "\nPrinting out the size of the sets...\n";
+    std::cout << "OpenSet  : " << open.size() << std::endl;
+    std::cout << "ClosedSet: " << closed.size() << std::endl;
+    std::cout << "Unvisited: " << unvisited.size() << std::endl;
+    std::cout << "Total    : " << total.size() << std::endl;
 }

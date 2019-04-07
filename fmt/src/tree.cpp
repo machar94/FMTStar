@@ -25,7 +25,7 @@ void Tree::PrintNodes()
     for (size_t i = 0; i < nodes.size(); ++i)
     {
         std::cout << "Point " << i << ": ";
-        for (size_t j = 0; j < nodes[i]->q.size()-1; ++j)
+        for (size_t j = 0; j < nodes[i]->q.size() - 1; ++j)
         {
             std::cout << nodes[i]->q[j] << ", ";
         }

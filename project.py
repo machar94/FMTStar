@@ -10,7 +10,7 @@ import os
 ##### Parameters #####
 WORLD   = [-3.4, 3.4, -1.4, 1.4]
 SAMPLES = 1000  
-
+RADIUS  = 1.0
 
 if not __openravepy_build_doc__:
     from openravepy import *
@@ -53,7 +53,8 @@ if __name__ == "__main__":
     tuckarms(env,robot);
         
     # The active DOF are translation in X and Y and rotation about the Z axis of the base of the robot.
-    robot.SetActiveDOFs([],DOFAffine.X|DOFAffine.Y|DOFAffine.RotationAxis,[0,0,1])
+    # robot.SetActiveDOFs([],DOFAffine.X|DOFAffine.Y|DOFAffine.RotationAxis,[0,0,1])
+    robot.SetActiveDOFs([],DOFAffine.X|DOFAffine.Y)
         
     state = robot.GetTransform()
     yaw = numpy.array([math.atan2(state[1,0], state[0,0])])
@@ -74,6 +75,7 @@ if __name__ == "__main__":
         FMTPlanner.SendCommand('SetGoal ' + goalConfigStr)
         FMTPlanner.SendCommand('DefineWorld ' + worldStr)
         FMTPlanner.SendCommand('SetNumSamples ' + str(SAMPLES))
+        FMTPlanner.SendCommand('SetRadius ' + str(RADIUS)) 
         # FMTPlanner.SendCommand('PrintClass')
         FMTPlanner.SendCommand('Run')
         
