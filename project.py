@@ -9,7 +9,7 @@ import os
 
 ##### Parameters #####
 WORLD    = [-3.4, 3.4, -1.4, 1.4]
-SAMPLES  = 400  
+SAMPLES  = 400 
 RADIUS   = 0.5
 STEPSIZE = 0.1
 
@@ -48,7 +48,8 @@ if __name__ == "__main__":
     env.SetCollisionChecker(collisionChecker)
 
     env.Reset()
-    env.Load('data/mp_env.env.xml')
+    env.Load('./envs/basic.env.xml')
+    # env.Load('four-chambers.env.xml')
     time.sleep(0.1)
     robot = env.GetRobots()[0]
     tuckarms(env,robot);
@@ -60,7 +61,7 @@ if __name__ == "__main__":
     state = robot.GetTransform()
     yaw = numpy.array([math.atan2(state[1,0], state[0,0])])
     startConfig = robot.GetTransform()[0:2,3].tolist()
-    goalConfig  = [2.6,-1.3]
+    goalConfig  = [3.4,-1.3]
 
     RaveLoadPlugin('fmt/build/fmt')
     FMTPlanner = RaveCreateModule(env, 'FMT')
@@ -80,7 +81,6 @@ if __name__ == "__main__":
         FMTPlanner.SendCommand('SetStepSize ' + str(STEPSIZE)) 
         # FMTPlanner.SendCommand('PrintClass')
         FMTPlanner.SendCommand('Run')
-        
     waitrobot(robot)
 
     raw_input("Press enter to exit...")
