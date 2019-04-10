@@ -22,6 +22,7 @@ class FMT : public ModuleBase
     double radius; // Radius for nearest neighbor search
     double stepSize;
     int seed;
+    std::string planner;
 
     std::vector<dReal> startConfig;
     std::vector<dReal> goalConfig;
@@ -86,6 +87,8 @@ class FMT : public ModuleBase
 
     bool SetSeed(std::ostream &sout, std::istream &sinput);
 
+    bool SetPlanner(std::ostream &sout, std::istream &sinput);
+
     bool PrintClass(std::ostream &sout, std::istream &sinput);
 
     bool Run(std::ostream &sout, std::istream &sinput);
@@ -149,7 +152,7 @@ void GetPluginAttributesValidated(PLUGININFO &info)
 OPENRAVE_PLUGIN_API void DestroyPlugin() {}
 
 FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
-    : ModuleBase(penv), N(0.0), dim(0), stepSize(0.1), seed(-1)
+    : ModuleBase(penv), N(0.0), dim(0), stepSize(0.1), seed(-1), planner("naive")
 {
     RegisterCommand("Init", boost::bind(&FMT::Init, this, _1, _2),
                     "Initializes the Planner");
@@ -167,6 +170,8 @@ FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
                     "Sets the step size to be used in collision checking");
     RegisterCommand("SetSeed", boost::bind(&FMT::SetSeed, this, _1, _2),
                     "Sets the random seed to be used for the simulation");
+    RegisterCommand("SetPlanner", boost::bind(&FMT::SetPlanner, this, _1, _2),
+                    "Choose either of the following: naive, smart");
     RegisterCommand("PrintClass", boost::bind(&FMT::PrintClass, this, _1, _2),
                     "Prints the member variables of FMT");
     RegisterCommand("Run", boost::bind(&FMT::Run, this, _1, _2),
@@ -186,7 +191,7 @@ bool FMT::Init(std::ostream &sout, std::istream &sinput)
         std::random_device rd;
         gen.seed(rd());
     }
-    else 
+    else
     {
         gen.seed(seed);
     }
@@ -270,6 +275,24 @@ bool FMT::SetSeed(std::ostream &sout, std::istream &sinput)
     std::string val;
     sinput >> val;
     seed = atof(val.c_str());
+
+    return true;
+}
+
+bool FMT::SetPlanner(std::ostream &sout, std::istream &sinput)
+{
+    std::string val;
+    sinput >> val;
+
+    if (val == "naive" || val == "smart")
+    {
+        planner = val;
+    }
+    else
+    {
+        std::cout << "Unrecognized planner.. using naive method" << std::endl;
+        planner = "naive";
+    }
 
     return true;
 }

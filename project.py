@@ -12,6 +12,8 @@ WORLD    = [-3.4, 3.4, -1.4, 1.4]
 SAMPLES  = 400 
 RADIUS   = 0.5
 STEPSIZE = 0.1
+SEED     = 1
+PLANNER  = "naive"
 
 if not __openravepy_build_doc__:
     from openravepy import *
@@ -79,6 +81,8 @@ if __name__ == "__main__":
         FMTPlanner.SendCommand('SetNumSamples ' + str(SAMPLES))
         FMTPlanner.SendCommand('SetRadius ' + str(RADIUS)) 
         FMTPlanner.SendCommand('SetStepSize ' + str(STEPSIZE)) 
+        FMTPlanner.SendCommand('SetSeed ' + str(SEED)) 
+        FMTPlanner.SendCommand('SetPlanner' + PLANNER) 
         # FMTPlanner.SendCommand('PrintClass')
         FMTPlanner.SendCommand('Run')
     waitrobot(robot)
