@@ -23,6 +23,7 @@ class FMT : public ModuleBase
     double stepSize;
     int seed;
     std::string planner;
+    uint fwdCollisionCheck;
 
     std::vector<dReal> startConfig;
     std::vector<dReal> goalConfig;
@@ -89,6 +90,8 @@ class FMT : public ModuleBase
 
     bool SetPlanner(std::ostream &sout, std::istream &sinput);
 
+    bool SetFwdCollisionCheck(std::ostream &sout, std::istream &sinput);
+    
     bool PrintClass(std::ostream &sout, std::istream &sinput);
 
     bool Run(std::ostream &sout, std::istream &sinput);
@@ -172,6 +175,9 @@ FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
                     "Sets the random seed to be used for the simulation");
     RegisterCommand("SetPlanner", boost::bind(&FMT::SetPlanner, this, _1, _2),
                     "Choose either of the following: naive, smart");
+    RegisterCommand("SetFwdCollisionCheck", boost::bind(&FMT::SetFwdCollisionCheck, this, _1, _2),
+                    "When executing a trajectory, how many configuraitons forward"
+                     " should the robot check to make sure it's positons are valid");
     RegisterCommand("PrintClass", boost::bind(&FMT::PrintClass, this, _1, _2),
                     "Prints the member variables of FMT");
     RegisterCommand("Run", boost::bind(&FMT::Run, this, _1, _2),
@@ -245,7 +251,7 @@ bool FMT::SetNumSamples(std::ostream &sout, std::istream &sinput)
 {
     std::string numSamples;
     sinput >> numSamples;
-    N = atof(numSamples.c_str());
+    N = atoi(numSamples.c_str());
 
     tree.Reserve(N);
 
@@ -274,7 +280,7 @@ bool FMT::SetSeed(std::ostream &sout, std::istream &sinput)
 {
     std::string val;
     sinput >> val;
-    seed = atof(val.c_str());
+    seed = atoi(val.c_str());
 
     return true;
 }
@@ -296,6 +302,16 @@ bool FMT::SetPlanner(std::ostream &sout, std::istream &sinput)
 
     return true;
 }
+
+bool FMT::SetFwdCollisionCheck(std::ostream &sout, std::istream &sinput)
+{
+    std::string val;
+    sinput >> val;
+    fwdCollisionCheck = atoi(val.c_str());
+
+    return true;
+}
+
 
 bool FMT::PrintClass(std::ostream &sout, std::istream &sinput)
 {
