@@ -21,6 +21,7 @@ class FMT : public ModuleBase
     size_t dim;
     double radius; // Radius for nearest neighbor search
     double stepSize;
+    int seed;
 
     std::vector<dReal> startConfig;
     std::vector<dReal> goalConfig;
@@ -36,7 +37,7 @@ class FMT : public ModuleBase
 
     // Handle to all of the points being plotted
     std::vector<GraphHandlePtr> ghandle;
-    
+
     class OpenSet
     {
         std::priority_queue<nodeptr_t, nodes_t, NodeComparator> open;
@@ -83,6 +84,8 @@ class FMT : public ModuleBase
 
     bool SetStepSize(std::ostream &sout, std::istream &sinput);
 
+    bool SetSeed(std::ostream &sout, std::istream &sinput);
+
     bool PrintClass(std::ostream &sout, std::istream &sinput);
 
     bool Run(std::ostream &sout, std::istream &sinput);
@@ -114,7 +117,7 @@ class FMT : public ModuleBase
     path_t BuildPath();
 
     void PlotPath(const float color[4], path_t &path);
-    
+
     void ExecuteTrajectory(path_t &path);
     /* Testing Functionality */
 
@@ -146,7 +149,7 @@ void GetPluginAttributesValidated(PLUGININFO &info)
 OPENRAVE_PLUGIN_API void DestroyPlugin() {}
 
 FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
-    : ModuleBase(penv), N(0.0), dim(0), stepSize(0.1)
+    : ModuleBase(penv), N(0.0), dim(0), stepSize(0.1), seed(-1)
 {
     RegisterCommand("Init", boost::bind(&FMT::Init, this, _1, _2),
                     "Initializes the Planner");
@@ -162,6 +165,8 @@ FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
                     "Sets the radius used by nearest neighbors");
     RegisterCommand("SetStepSize", boost::bind(&FMT::SetStepSize, this, _1, _2),
                     "Sets the step size to be used in collision checking");
+    RegisterCommand("SetSeed", boost::bind(&FMT::SetSeed, this, _1, _2),
+                    "Sets the random seed to be used for the simulation");
     RegisterCommand("PrintClass", boost::bind(&FMT::PrintClass, this, _1, _2),
                     "Prints the member variables of FMT");
     RegisterCommand("Run", boost::bind(&FMT::Run, this, _1, _2),
@@ -176,8 +181,15 @@ bool FMT::Init(std::ostream &sout, std::istream &sinput)
     GetEnv()->GetRobots(vrobots);
     robot = vrobots.at(0);
 
-    std::random_device rd;
-    gen.seed(rd());
+    if (seed == -1)
+    {
+        std::random_device rd;
+        gen.seed(rd());
+    }
+    else 
+    {
+        gen.seed(seed);
+    }
 
     return true;
 }
@@ -249,6 +261,15 @@ bool FMT::SetStepSize(std::ostream &sout, std::istream &sinput)
     std::string val;
     sinput >> val;
     stepSize = atof(val.c_str());
+
+    return true;
+}
+
+bool FMT::SetSeed(std::ostream &sout, std::istream &sinput)
+{
+    std::string val;
+    sinput >> val;
+    seed = atof(val.c_str());
 
     return true;
 }
@@ -461,7 +482,7 @@ bool FMT::FindPath()
                 // Add node x to tree and add its parent is yMin
                 currNN[i]->parent = yMin;
                 tree.AddNode(currNN[i]);
-                
+
                 // Add node x to the open_new set
                 // Wait to change to open
                 open_new.push_back(currNN[i]);
@@ -469,7 +490,7 @@ bool FMT::FindPath()
                 // Remove node x from unvisited and change to open
                 auto it = std::remove(unvisited.begin(), unvisited.end(), currNN[i]);
                 unvisited.erase(it, unvisited.end());
-    
+
                 // Update cost of node x (y->x) + cost(y)
                 currNN[i]->cost = yMin->cost + CalcEuclidianDist(yMin, currNN[i]);
             }
@@ -499,7 +520,7 @@ path_t FMT::BuildPath()
     path_t path;
     nodeptr_t currNode = goalNode;
 
-    while(currNode.get())
+    while (currNode.get())
     {
         path.push_back(currNode->q);
         currNode = currNode->parent;
@@ -513,10 +534,9 @@ void FMT::PlotPath(const float color[4], path_t &path)
     std::vector<float> p(3, 0.05);
     for (auto it = path.rbegin(); it != path.rend(); ++it)
     {
-        p[0] = (*it)[0]; 
+        p[0] = (*it)[0];
         p[1] = (*it)[1];
         ghandle.push_back(GetEnv()->plot3(&p[0], 1, 12, 5, color, 0));
-
     }
 }
 

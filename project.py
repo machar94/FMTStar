@@ -48,7 +48,7 @@ if __name__ == "__main__":
     env.SetCollisionChecker(collisionChecker)
 
     env.Reset()
-    env.Load('./envs/basic.env.xml')
+    env.Load('./envs/basic-withTables.env.xml')
     # env.Load('four-chambers.env.xml')
     time.sleep(0.1)
     robot = env.GetRobots()[0]
