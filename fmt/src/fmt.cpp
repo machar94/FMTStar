@@ -124,6 +124,8 @@ class FMT : public ModuleBase
 
     void PlotPath(const float color[4], path_t &path);
 
+    void PlotSet(const float color[4], const nodes_t & nodes);
+
     void ExecuteTrajectory(path_t &path);
 
     void PrintClass_Internal();
@@ -368,6 +370,8 @@ bool FMT::Run(std::ostream &sout, std::istream &sinput)
 
     path_t path = BuildPath();
 
+    PlotSet(babyblue, closed);
+    PlotSet(yellow, unvisited);
     PlotPath(red, path);
 
     ExecuteTrajectory(path);
@@ -528,6 +532,10 @@ bool FMT::FindPath()
             }
         }
 
+        // Update closed list: Vclosed U {Z}
+        currNode->setType = CLOSED;
+        closed.push_back(currNode);
+
         // Update open list: (Vopen U Vopen_new) \ {z}
         open.pop();
         for (auto &node : open_new)
@@ -610,4 +618,15 @@ void FMT::PrintClass_Internal()
     std::cout << "Seed: " << seed << std::endl;
     std::cout << "Planner: " << planner << std::endl;
     std::cout << "# FWD Checks: " << fwdCollisionCheck << std::endl;
+}
+
+void FMT::PlotSet(const float color[4], const nodes_t & nodes)
+{
+    std::vector<float> p(3, 0.05);
+    for (const auto & node : nodes)
+    {
+        p[0] = node->q[0];
+        p[1] = node->q[1];
+        ghandle.push_back(GetEnv()->plot3(&p[0], 1, 12, 5, color, 0));
+    }
 }
