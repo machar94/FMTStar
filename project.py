@@ -15,6 +15,8 @@ STEPSIZE = 0.1
 SEED     = 1
 PLANNER  = "naive"
 FWD_COLLISION_CHECK = 2
+TRIGGER1 = "0.0 Table1 1.5 -0.5 Table2 2.5 -0.5"
+TRIGGER2 = "3.4 Table3 5.5 1.5 Table4 6.5 1.5"
 
 if not __openravepy_build_doc__:
     from openravepy import *
@@ -84,7 +86,10 @@ if __name__ == "__main__":
         FMTPlanner.SendCommand('SetStepSize ' + str(STEPSIZE)) 
         FMTPlanner.SendCommand('SetSeed ' + str(SEED)) 
         FMTPlanner.SendCommand('SetPlanner ' + PLANNER) 
-        FMTPlanner.SendCommand('SetFwdCollisionCheck ' + str(FWD_COLLISION_CHECK)) 
+        FMTPlanner.SendCommand('SetFwdCollisionCheck ' + str(FWD_COLLISION_CHECK))
+        FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER1))
+        FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER2))
+
         # FMTPlanner.SendCommand('PrintClass')
         FMTPlanner.SendCommand('Run')
     waitrobot(robot)

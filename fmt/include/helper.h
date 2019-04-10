@@ -9,7 +9,7 @@
 #include <tree.h>
 
 template <class T>
-inline void printVector(std::vector<T> &vec)
+inline void printVector(const std::vector<T> &vec)
 {
     for (auto &val : vec)
     {

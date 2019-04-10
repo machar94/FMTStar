@@ -12,6 +12,7 @@
 #include <openrave/planningutils.h>
 
 #include <fmt.h>
+#include <trigger.h>
 
 using namespace OpenRAVE;
 
@@ -39,6 +40,8 @@ class FMT : public ModuleBase
 
     // Handle to all of the points being plotted
     std::vector<GraphHandlePtr> ghandle;
+
+    triggers_t triggers;
 
     class OpenSet
     {
@@ -90,6 +93,8 @@ class FMT : public ModuleBase
 
     bool SetPlanner(std::ostream &sout, std::istream &sinput);
 
+    bool CreateTrigger(std::ostream &sout, std::istream &sinput);
+
     bool SetFwdCollisionCheck(std::ostream &sout, std::istream &sinput);
     
     bool PrintClass(std::ostream &sout, std::istream &sinput);
@@ -137,6 +142,9 @@ class FMT : public ModuleBase
 
     // Tests to see the size of each set (total, open, closed, unvisted)
     void TestSetSizes();
+
+    // Tests whether the trigger was built properly
+    void TestTriggers();
 };
 
 // Called to create a new plugin
@@ -183,6 +191,9 @@ FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
     RegisterCommand("SetFwdCollisionCheck", boost::bind(&FMT::SetFwdCollisionCheck, this, _1, _2),
                     "When executing a trajectory, how many configuraitons forward"
                      " should the robot check to make sure it's positons are valid");
+    RegisterCommand("CreateTrigger", boost::bind(&FMT::CreateTrigger, this, _1, _2),
+                    "Creates a trigger to specify where to place tables upon "
+                    "robot passing the trigger point passed in");
     RegisterCommand("PrintClass", boost::bind(&FMT::PrintClass, this, _1, _2),
                     "Prints the member variables of FMT");
     RegisterCommand("Run", boost::bind(&FMT::Run, this, _1, _2),
@@ -317,6 +328,11 @@ bool FMT::SetFwdCollisionCheck(std::ostream &sout, std::istream &sinput)
     return true;
 }
 
+bool FMT::CreateTrigger(std::ostream &sout, std::istream &sinput)
+{
+    std::shared_ptr<Trigger> trigger = std::make_shared<Trigger>(sinput);
+    triggers.push_back(trigger);
+}
 
 bool FMT::PrintClass(std::ostream &sout, std::istream &sinput)
 {
@@ -362,6 +378,8 @@ void FMT::TestOpenSet()
 bool FMT::Run(std::ostream &sout, std::istream &sinput)
 {
     PrintClass_Internal();
+
+    TestTriggers();
 
     // Initialize and set the open, unvisited and closed sets
     SetupSets();
@@ -629,4 +647,18 @@ void FMT::PlotSet(const float color[4], const nodes_t & nodes)
         p[1] = node->q[1];
         ghandle.push_back(GetEnv()->plot3(&p[0], 1, 12, 5, color, 0));
     }
+}
+void FMT::TestTriggers()
+{
+    std::cout << "Printing out Triggers..." << std::endl;
+    for (const auto & trigger : triggers)
+    {
+        std::cout << "Trigger Point: " << trigger->triggerPoint << std::endl;
+        for (const auto & obj : trigger->dynobjs)
+        {
+            std::cout << "ObjName: " << obj.first << " Loc: ";
+            printVector(obj.second);
+        }
+    }
+    std::cout << std::endl;
 }
