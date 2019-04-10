@@ -125,6 +125,9 @@ class FMT : public ModuleBase
     void PlotPath(const float color[4], path_t &path);
 
     void ExecuteTrajectory(path_t &path);
+
+    void PrintClass_Internal();
+
     /* Testing Functionality */
 
     // Tests to see if min heap is working correctly
@@ -315,19 +318,7 @@ bool FMT::SetFwdCollisionCheck(std::ostream &sout, std::istream &sinput)
 
 bool FMT::PrintClass(std::ostream &sout, std::istream &sinput)
 {
-    std::cout << "\n---- FMT Class Values ----\n";
-    std::cout << "Number of Samples: " << N << std::endl;
-    std::cout << "World Config Space: " << std::endl;
-    for (auto &val : world)
-    {
-        std::cout << "\t";
-        printVector(val);
-    }
-    std::cout << "Start: ";
-    printVector(startConfig);
-    std::cout << "Goal:  ";
-    printVector(goalConfig);
-    std::cout << "Radius: " << radius << std::endl;
+    PrintClass_Internal();
 
     return true;
 }
@@ -368,6 +359,8 @@ void FMT::TestOpenSet()
 
 bool FMT::Run(std::ostream &sout, std::istream &sinput)
 {
+    PrintClass_Internal();
+
     // Initialize and set the open, unvisited and closed sets
     SetupSets();
 
@@ -596,4 +589,25 @@ void FMT::ExecuteTrajectory(path_t &path)
     std::vector<double> maxAcc(2, 5.0);
     OpenRAVE::planningutils::RetimeAffineTrajectory(traj, maxVel, maxAcc);
     robot->GetController()->SetPath(traj);
+}
+
+void FMT::PrintClass_Internal()
+{
+    std::cout << "\n---- FMT Class Values ----\n";
+    std::cout << "Number of Samples: " << N << std::endl;
+    std::cout << "World Config Space: " << std::endl;
+    for (auto &val : world)
+    {
+        std::cout << "\t";
+        printVector(val);
+    }
+    std::cout << "Start: ";
+    printVector(startConfig);
+    std::cout << "Goal:  ";
+    printVector(goalConfig);
+    std::cout << "Radius: " << radius << std::endl;
+    std::cout << "Step size: " << stepSize << std::endl;
+    std::cout << "Seed: " << seed << std::endl;
+    std::cout << "Planner: " << planner << std::endl;
+    std::cout << "# FWD Checks: " << fwdCollisionCheck << std::endl;
 }

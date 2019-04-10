@@ -2,16 +2,6 @@
 
 #include <helper.h>
 
-template <class T>
-inline void printVector(std::vector<T> &vec)
-{
-    for (auto &val : vec)
-    {
-        std::cout << val << " ";
-    }
-    std::cout << std::endl;
-}
-
 double CalcEuclidianDist(const nodeptr_t &n1, const nodeptr_t &n2)
 {
     return CalcEuclidianDist(n1->q, n2->q);

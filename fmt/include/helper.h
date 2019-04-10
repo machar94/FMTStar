@@ -9,7 +9,14 @@
 #include <tree.h>
 
 template <class T>
-inline void printVector(std::vector<T> &vec);
+inline void printVector(std::vector<T> &vec)
+{
+    for (auto &val : vec)
+    {
+        std::cout << val << " ";
+    }
+    std::cout << std::endl;
+}
 
 void FindNearestNeighbors(
     nodes_t &set,
