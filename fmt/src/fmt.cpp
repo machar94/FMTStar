@@ -392,7 +392,7 @@ bool FMT::Run(std::ostream &sout, std::istream &sinput)
     PlotSet(yellow, unvisited);
     PlotPath(red, path);
 
-    ExecuteTrajectory(path);
+    // ExecuteTrajectory(path);
 
     return true;
 }

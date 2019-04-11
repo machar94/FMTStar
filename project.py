@@ -9,7 +9,7 @@ import os
 
 ##### Parameters #####
 WORLD    = [-5.4, 5.4, -1.4, 1.4]
-SAMPLES  = 600 
+SAMPLES  = 800 
 RADIUS   = 0.5
 STEPSIZE = 0.1
 SEED     = 1
