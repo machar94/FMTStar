@@ -432,7 +432,7 @@ bool FMT::Run(std::ostream &sout, std::istream &sinput)
     PlotPath(colors.GetColor(), path);
     TestSetSizes();
 
-    // ExecuteTrajectory(path, startConfig);
+    ExecuteTrajectory(path, startConfig);
 
     return true;
 }
@@ -654,13 +654,13 @@ path_t FMT::BuildPath()
     path_t path;
     nodeptr_t currNode = goalNode;
 
-    while (currNode.get())
+    // Don't add start location to path
+    while (currNode->parent.get())
     {
         path.push_back(currNode->q);
         currNode = currNode->parent;
     }
 
-    /*
     std::ofstream outFile("path.txt");
     if (outFile.is_open())
     {
@@ -674,7 +674,6 @@ path_t FMT::BuildPath()
         std::cout << "Something went wrong opening the path.txt file :( " << std::endl;
     }
     outFile.close();
-    */
     return path;
 }
 
@@ -697,7 +696,7 @@ void FMT::ExecuteTrajectory(path_t &path, config_t &startCfg)
     traj->Init(robot->GetActiveConfigurationSpecification());
 
     int i = 0;
-    for (auto it = path.begin(); it != path.end(); ++it)
+    for (auto it = path.rbegin(); it != path.rend(); ++it)
     {
         traj->Insert(i, *it);
         i++;
@@ -756,9 +755,49 @@ void FMT::TestTriggers()
 
 bool FMT::ExecuteMultiThreadTraj(path_t &path, config_t &startCfg)
 {
-    std::cout << "Just smile and wave for now :) " << std::endl;
+    bool reachedGoal = false;
 
-    return true;
+    while (!reachedGoal)
+    {
+        // Step 2. Do a forward check to see if next couple of steps are free to move ahead
+        bool robotCollided = false;
+        uint lim = (fwdCollisionCheck < path.size()) ? fwdCollisionCheck : path.size();
+        auto it = path.rbegin();
+        for (uint i = 0;  i < lim; ++i)
+        {
+            // std::cout << (*it)[0] << " " << (*it)[1] << std::endl;
+            if (CheckCollision((*it)))
+            {
+                robotCollided = true;
+                break;
+            }
+            it++;
+        }
+        // Need to replan
+        if (robotCollided)
+        {
+            return reachedGoal;
+        }
+
+        // Step 3. Execute trajectory that was validated to be free
+        // Send in small path in reverse to execute trajectory since it uses reverse iterators
+        path_t smallPath(lim, config_t());
+        for (int i = lim-1; i >= 0; --i)
+        {
+            smallPath[i] = *path.rbegin();
+            path.pop_back();
+        }
+
+        ExecuteTrajectory(smallPath, startCfg);
+        startCfg = smallPath[0]; // Update to current pose after execute trajectory
+
+        if (startCfg == goalConfig)
+        {
+            reachedGoal = true;
+        }
+    }
+    
+    return reachedGoal;
 }
 
 void FMT::SaveNodesInBuffer(const path_t& path)
