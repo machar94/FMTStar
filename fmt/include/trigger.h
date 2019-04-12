@@ -11,8 +11,14 @@
 
 using namespace OpenRAVE;
 
+struct Transformation
+{
+    std::vector<dReal> position;
+    double rotation;
+};
+
 class Trigger;
-using dynobj_t = std::pair<std::string, std::vector<dReal>>;
+using dynobj_t = std::pair<std::string, Transformation>;
 using triggers_t = std::vector<std::shared_ptr<Trigger>>;
 
 class Trigger
@@ -23,9 +29,8 @@ public:
 
 public:
     // Class is initialized with string holding paramters
-    // <trigger point (double)> <KinBody1> <x-coord> <y-coord> <KinBody2> ...
+    // <trigger point (double)> <KinBody1> <x-coord> <y-coord> <z-rot> <KinBody2> ...
     Trigger(std::istream &os);
-
 };
 
 #endif

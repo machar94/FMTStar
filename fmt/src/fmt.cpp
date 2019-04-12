@@ -114,7 +114,6 @@ class FMT : public ModuleBase
 
     bool RunWithReplan(std::ostream &sout, std::istream &sinput);
 
-
   private:
     // Initialize open, closed and unvisited sets
     // 1. Open set should have only start
@@ -156,6 +155,12 @@ class FMT : public ModuleBase
     bool ExecuteMultiThreadTraj(path_t &path, config_t &startCfg);
 
     void SaveNodesInBuffer(const path_t &path);
+
+    // Assumption: Triggers should be in order of when the would get tripped
+    // Triggers get tripped from based on the x position of the robot. The
+    // moment the x position of the robot in the world coordinate sytem crosses
+    // the trigger point, the environment is updated based on the trigger class
+    void CheckTriggers(const config_t &currPos);
 
     void PrintClass_Internal();
 
@@ -323,7 +328,7 @@ bool FMT::SetSeed(std::ostream &sout, std::istream &sinput)
     std::string val;
     sinput >> val;
     seed = atoi(val.c_str());
-    
+
     if (seed == -1)
     {
         std::random_device rd;
@@ -441,12 +446,14 @@ bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
 {
     config_t currConfig = startConfig;
 
+    // TestTriggers();
+
     bool reachedGoal = false;
     while (reachedGoal == false)
     {
         SetupSets(currConfig);
 
-        if(!FindPath())
+        if (!FindPath())
         {
             std::cout << "Unable to find a path!" << std::endl;
             break;
@@ -454,14 +461,14 @@ bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
 
         path_t path = BuildPath();
         PlotPath(colors.GetColor(), path);
-        
+
         reachedGoal = ExecuteMultiThreadTraj(path, currConfig);
         if (reachedGoal)
         {
             break;
         }
 
-        SaveNodesInBuffer(path); 
+        SaveNodesInBuffer(path);
     }
     return true;
 }
@@ -746,8 +753,9 @@ void FMT::TestTriggers()
         std::cout << "Trigger Point: " << trigger->triggerPoint << std::endl;
         for (const auto &obj : trigger->dynobjs)
         {
-            std::cout << "ObjName: " << obj.first << " Loc: ";
-            printVector(obj.second);
+            std::cout << "ObjName: " << obj.first
+                      << " Rot: " << obj.second.rotation << " Loc: ";
+            printVector(obj.second.position);
         }
     }
     std::cout << std::endl;
@@ -759,11 +767,14 @@ bool FMT::ExecuteMultiThreadTraj(path_t &path, config_t &startCfg)
 
     while (!reachedGoal)
     {
+        // Step 1. Check to see if the environment should update (Trigger)
+        CheckTriggers(startCfg);
+
         // Step 2. Do a forward check to see if next couple of steps are free to move ahead
         bool robotCollided = false;
         uint lim = (fwdCollisionCheck < path.size()) ? fwdCollisionCheck : path.size();
         auto it = path.rbegin();
-        for (uint i = 0;  i < lim; ++i)
+        for (uint i = 0; i < lim; ++i)
         {
             // std::cout << (*it)[0] << " " << (*it)[1] << std::endl;
             if (CheckCollision((*it)))
@@ -782,7 +793,7 @@ bool FMT::ExecuteMultiThreadTraj(path_t &path, config_t &startCfg)
         // Step 3. Execute trajectory that was validated to be free
         // Send in small path in reverse to execute trajectory since it uses reverse iterators
         path_t smallPath(lim, config_t());
-        for (int i = lim-1; i >= 0; --i)
+        for (int i = lim - 1; i >= 0; --i)
         {
             smallPath[i] = *path.rbegin();
             path.pop_back();
@@ -796,11 +807,38 @@ bool FMT::ExecuteMultiThreadTraj(path_t &path, config_t &startCfg)
             reachedGoal = true;
         }
     }
-    
+
     return reachedGoal;
 }
 
-void FMT::SaveNodesInBuffer(const path_t& path)
+void FMT::CheckTriggers(const config_t &currPos)
 {
-    
+    // All triggers have been hit, return immediately
+    if (triggers.size() == 0)
+    {
+        return;
+    }
+
+    // currPos[0] <- x-coord
+    if (currPos[0] > triggers.back()->triggerPoint)
+    {
+        // Update environment
+        for (const auto &dynobj : triggers.back()->dynobjs)
+        {
+            auto x = dynobj.second.position[0];
+            auto y = dynobj.second.position[1];
+            RaveVector<dReal> axis(0,0,1);
+            // std::cout << "rot: " << dynobj.second.rotation << std::endl;
+            auto rot = geometry::quatFromAxisAngle(axis, dynobj.second.rotation * M_PI / 180);
+            // std::cout << rot << std::endl;
+            auto t = Transform(rot,{x, y, 0.74});
+            GetEnv()->GetKinBody(dynobj.first)->SetTransform(t);
+        }
+
+        triggers.pop_back();
+    }
+}
+
+void FMT::SaveNodesInBuffer(const path_t &path)
+{
 }

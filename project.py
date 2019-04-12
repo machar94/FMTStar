@@ -15,8 +15,8 @@ STEPSIZE = 0.1
 SEED     = 7
 PLANNER  = "naive"
 FWD_COLLISION_CHECK = 2
-TRIGGER1 = "0.0 Table1 1.5 -0.5 Table2 2.5 -0.5"
-TRIGGER2 = "3.4 Table3 5.5 1.5 Table4 6.5 1.5"
+TRIGGER1 = "2.0 Table3 3.1 0.1 90 Table4 4.2 0.0 0"
+TRIGGER2 = "-2.0 Table1 -0.3 0.7 90 Table2 0.5 -1.2 0 "
 GOAL_CONFIG  = [2.6,1.3]
 
 

@@ -6,13 +6,14 @@ Trigger::Trigger(std::istream &is)
     is >> triggerPoint;
 
     std::string bodyName;
-    double x, y;
-    while (is >> bodyName >> x >> y)
+    double x, y, rot;
+    while (is >> bodyName >> x >> y >> rot)
     {
-        std::vector<dReal> position;
-        position.push_back(x);
-        position.push_back(y);
-        dynobj_t obj(bodyName, position);
+        Transformation t; 
+        t.position.push_back(x);
+        t.position.push_back(y);
+        t.rotation = rot;
+        dynobj_t obj(bodyName, t);
         dynobjs.push_back(obj);
     }
 }
