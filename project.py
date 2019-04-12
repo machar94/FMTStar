@@ -9,15 +9,15 @@ import os
 
 ##### Parameters #####
 WORLD    = [-5.4, 5.4, -1.4, 1.4]
-SAMPLES  = 800 
+SAMPLES  = 600 
 RADIUS   = 0.5
 STEPSIZE = 0.1
-SEED     = 1
+SEED     = 2
 PLANNER  = "naive"
 FWD_COLLISION_CHECK = 2
 TRIGGER1 = "0.0 Table1 1.5 -0.5 Table2 2.5 -0.5"
 TRIGGER2 = "3.4 Table3 5.5 1.5 Table4 6.5 1.5"
-GOAL_CONFIG  = [5.3,-1.3]
+GOAL_CONFIG  = [2.6,1.3]
 
 
 if not __openravepy_build_doc__:
@@ -92,7 +92,9 @@ if __name__ == "__main__":
         FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER2))
 
         # FMTPlanner.SendCommand('PrintClass')
-        FMTPlanner.SendCommand('Run')
+        # FMTPlanner.SendCommand('Run')
+        FMTPlanner.SendCommand('RunWithReplan')
+
     waitrobot(robot)
 
     raw_input("Press enter to exit...")

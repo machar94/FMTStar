@@ -21,6 +21,8 @@ class Tree
     void AddNode(nodeptr_t &node);
 
     void PrintNodes();
+
+    void ClearTree();
 };
 
 #endif

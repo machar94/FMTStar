@@ -25,3 +25,9 @@ void Tree::PrintNodes()
         std::cout << "Cost: " << nodes[i]->cost << std::endl;
     }
 }
+
+void Tree::ClearTree()
+{
+    nodes.clear();
+    Reserve(size);
+}

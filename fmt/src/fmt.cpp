@@ -3,6 +3,7 @@
 #include <chrono>
 #include <queue>
 #include <limits>
+#include <fstream>
 
 #include <openrave-core.h>
 #include <openrave/plugin.h>
@@ -59,6 +60,14 @@ class FMT : public ModuleBase
         void pop() { open.pop(); }
 
         size_t size() const { return open.size(); }
+
+        void clearSet()
+        {
+            while (!open.empty())
+            {
+                open.pop();
+            }
+        }
     };
 
     OpenSet open;
@@ -69,6 +78,8 @@ class FMT : public ModuleBase
     std::unordered_map<nodeptr_t, nodes_t> neighborTable;
 
     nodeptr_t currNode;
+
+    Colors colors;
 
   public:
     FMT(EnvironmentBasePtr penv, std::istream &ss);
@@ -96,17 +107,20 @@ class FMT : public ModuleBase
     bool CreateTrigger(std::ostream &sout, std::istream &sinput);
 
     bool SetFwdCollisionCheck(std::ostream &sout, std::istream &sinput);
-    
+
     bool PrintClass(std::ostream &sout, std::istream &sinput);
 
     bool Run(std::ostream &sout, std::istream &sinput);
+
+    bool RunWithReplan(std::ostream &sout, std::istream &sinput);
+
 
   private:
     // Initialize open, closed and unvisited sets
     // 1. Open set should have only start
     // 2. Closed set should be empty
     // 3. Unvisited should have N-1 configs (goal + N-2 samples)
-    void SetupSets();
+    void SetupSets(config_t &startCfg);
 
     // Addes N-1 samples (including goal config) to unvisited set
     void GenerateSamples();
@@ -129,9 +143,19 @@ class FMT : public ModuleBase
 
     void PlotPath(const float color[4], path_t &path);
 
-    void PlotSet(const float color[4], const nodes_t & nodes);
+    void PlotSet(const float color[4], const nodes_t &nodes);
 
-    void ExecuteTrajectory(path_t &path);
+    void ExecuteTrajectory(path_t &path, config_t &startCfg);
+
+    // Not actually multithreaded but simulates checking robot collision a
+    // couple steps ahead and then executing the steps. Additionally checks
+    // whether to change the environment based on the triggers
+    //
+    // Returns true when robot has reached the goal config, false if the
+    // triggers require a replanning
+    bool ExecuteMultiThreadTraj(path_t &path, config_t &startCfg);
+
+    void SaveNodesInBuffer(const path_t &path);
 
     void PrintClass_Internal();
 
@@ -168,7 +192,7 @@ void GetPluginAttributesValidated(PLUGININFO &info)
 OPENRAVE_PLUGIN_API void DestroyPlugin() {}
 
 FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
-    : ModuleBase(penv), N(0.0), dim(0), stepSize(0.1), seed(-1), planner("naive")
+    : ModuleBase(penv), N(0.0), dim(0), stepSize(0.1), seed(-1), planner("naive"), colors(Colors())
 {
     RegisterCommand("Init", boost::bind(&FMT::Init, this, _1, _2),
                     "Initializes the Planner");
@@ -190,7 +214,7 @@ FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
                     "Choose either of the following: naive, smart");
     RegisterCommand("SetFwdCollisionCheck", boost::bind(&FMT::SetFwdCollisionCheck, this, _1, _2),
                     "When executing a trajectory, how many configuraitons forward"
-                     " should the robot check to make sure it's positons are valid");
+                    " should the robot check to make sure it's positons are valid");
     RegisterCommand("CreateTrigger", boost::bind(&FMT::CreateTrigger, this, _1, _2),
                     "Creates a trigger to specify where to place tables upon "
                     "robot passing the trigger point passed in");
@@ -198,6 +222,8 @@ FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
                     "Prints the member variables of FMT");
     RegisterCommand("Run", boost::bind(&FMT::Run, this, _1, _2),
                     "Run FMT planner");
+    RegisterCommand("RunWithReplan", boost::bind(&FMT::RunWithReplan, this, _1, _2),
+                    "Run FMT planner with replanning algo and dynamic objects");
 }
 
 bool FMT::Init(std::ostream &sout, std::istream &sinput)
@@ -226,7 +252,7 @@ bool FMT::SetStart(std::ostream &sout, std::istream &sinput)
     std::string val;
     while (sinput >> val)
     {
-        goalConfig.push_back(atof(val.c_str()));
+        startConfig.push_back(atof(val.c_str()));
     }
     return true;
 }
@@ -236,7 +262,7 @@ bool FMT::SetGoal(std::ostream &sout, std::istream &sinput)
     std::string val;
     while (sinput >> val)
     {
-        startConfig.push_back(atof(val.c_str()));
+        goalConfig.push_back(atof(val.c_str()));
     }
     return true;
 }
@@ -297,6 +323,17 @@ bool FMT::SetSeed(std::ostream &sout, std::istream &sinput)
     std::string val;
     sinput >> val;
     seed = atoi(val.c_str());
+    
+    if (seed == -1)
+    {
+        std::random_device rd;
+        gen.seed(rd());
+    }
+    else
+    {
+        std::cout << "Setting up seed..." << std::endl;
+        gen.seed(seed);
+    }
 
     return true;
 }
@@ -332,6 +369,8 @@ bool FMT::CreateTrigger(std::ostream &sout, std::istream &sinput)
 {
     std::shared_ptr<Trigger> trigger = std::make_shared<Trigger>(sinput);
     triggers.push_back(trigger);
+
+    return true;
 }
 
 bool FMT::PrintClass(std::ostream &sout, std::istream &sinput)
@@ -377,30 +416,67 @@ void FMT::TestOpenSet()
 
 bool FMT::Run(std::ostream &sout, std::istream &sinput)
 {
-    PrintClass_Internal();
+    // PrintClass_Internal();
 
-    TestTriggers();
+    // TestTriggers();
 
     // Initialize and set the open, unvisited and closed sets
-    SetupSets();
+    SetupSets(startConfig);
 
-    bool isSolved = FindPath();
+    FindPath();
 
     path_t path = BuildPath();
+    std::cout << "OpenSet: " << open.size() << std::endl;
+    PlotSet(colors.GetColor(), closed);
+    PlotSet(colors.GetColor(), unvisited);
+    PlotPath(colors.GetColor(), path);
+    TestSetSizes();
 
-    PlotSet(babyblue, closed);
-    PlotSet(yellow, unvisited);
-    PlotPath(red, path);
-
-    // ExecuteTrajectory(path);
+    // ExecuteTrajectory(path, startConfig);
 
     return true;
 }
 
-void FMT::SetupSets()
+bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
 {
+    config_t currConfig = startConfig;
+
+    bool reachedGoal = false;
+    while (reachedGoal == false)
+    {
+        SetupSets(currConfig);
+
+        if(!FindPath())
+        {
+            std::cout << "Unable to find a path!" << std::endl;
+            break;
+        }
+
+        path_t path = BuildPath();
+        PlotPath(colors.GetColor(), path);
+        
+        reachedGoal = ExecuteMultiThreadTraj(path, currConfig);
+        if (reachedGoal)
+        {
+            break;
+        }
+
+        SaveNodesInBuffer(path); 
+    }
+    return true;
+}
+
+void FMT::SetupSets(config_t &startCfg)
+{
+    // Empty tree, open set, unvisited, closed, total
+    open.clearSet();
+    tree.ClearTree();
+    unvisited.clear();
+    closed.clear();
+    total.clear();
+
     nodeptr_t nullParent;
-    nodeptr_t start = std::make_shared<Node>(startConfig, nullParent);
+    nodeptr_t start = std::make_shared<Node>(startCfg, nullParent);
     open.push(start);
     tree.AddNode(start);
 
@@ -584,6 +660,21 @@ path_t FMT::BuildPath()
         currNode = currNode->parent;
     }
 
+    /*
+    std::ofstream outFile("path.txt");
+    if (outFile.is_open())
+    {
+        for (const auto &loc : path)
+        {
+            outFile << loc[0] << " " << loc[1] << std::endl;
+        }
+    }
+    else
+    {
+        std::cout << "Something went wrong opening the path.txt file :( " << std::endl;
+    }
+    outFile.close();
+    */
     return path;
 }
 
@@ -598,9 +689,9 @@ void FMT::PlotPath(const float color[4], path_t &path)
     }
 }
 
-void FMT::ExecuteTrajectory(path_t &path)
+void FMT::ExecuteTrajectory(path_t &path, config_t &startCfg)
 {
-    robot->SetActiveDOFValues(startConfig);
+    robot->SetActiveDOFValues(startCfg);
 
     TrajectoryBasePtr traj = RaveCreateTrajectory(GetEnv(), "");
     traj->Init(robot->GetActiveConfigurationSpecification());
@@ -638,10 +729,10 @@ void FMT::PrintClass_Internal()
     std::cout << "# FWD Checks: " << fwdCollisionCheck << std::endl;
 }
 
-void FMT::PlotSet(const float color[4], const nodes_t & nodes)
+void FMT::PlotSet(const float color[4], const nodes_t &nodes)
 {
     std::vector<float> p(3, 0.05);
-    for (const auto & node : nodes)
+    for (const auto &node : nodes)
     {
         p[0] = node->q[0];
         p[1] = node->q[1];
@@ -651,14 +742,26 @@ void FMT::PlotSet(const float color[4], const nodes_t & nodes)
 void FMT::TestTriggers()
 {
     std::cout << "Printing out Triggers..." << std::endl;
-    for (const auto & trigger : triggers)
+    for (const auto &trigger : triggers)
     {
         std::cout << "Trigger Point: " << trigger->triggerPoint << std::endl;
-        for (const auto & obj : trigger->dynobjs)
+        for (const auto &obj : trigger->dynobjs)
         {
             std::cout << "ObjName: " << obj.first << " Loc: ";
             printVector(obj.second);
         }
     }
     std::cout << std::endl;
+}
+
+bool FMT::ExecuteMultiThreadTraj(path_t &path, config_t &startCfg)
+{
+    std::cout << "Just smile and wave for now :) " << std::endl;
+
+    return true;
+}
+
+void FMT::SaveNodesInBuffer(const path_t& path)
+{
+    
 }
