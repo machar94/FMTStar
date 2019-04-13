@@ -28,7 +28,7 @@ class FMT : public ModuleBase
     std::string planner;
     uint fwdCollisionCheck;
     double sampleBiasPercentage;
-    
+
     std::vector<dReal> startConfig;
     std::vector<dReal> goalConfig;
     std::vector<std::vector<dReal>> world;
@@ -108,7 +108,7 @@ class FMT : public ModuleBase
     bool SetPlanner(std::ostream &sout, std::istream &sinput);
 
     bool SetSampleBias(std::ostream &sout, std::istream &sinput);
-    
+
     bool CreateTrigger(std::ostream &sout, std::istream &sinput);
 
     bool SetFwdCollisionCheck(std::ostream &sout, std::istream &sinput);
@@ -127,7 +127,7 @@ class FMT : public ModuleBase
     void SetupSets(config_t &startCfg, path_t &path, std::ostream &sout);
 
     // Addes N-1 samples (including goal config) to unvisited set
-    void GenerateSamples(path_t & path, std::ostream &sout);
+    void GenerateSamples(path_t &path, std::ostream &sout);
 
     // Checks if a configuration is valid
     bool CheckCollision(const config_t &config) const;
@@ -460,8 +460,10 @@ bool FMT::Run(std::ostream &sout, std::istream &sinput)
 
 bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
 {
-    GetEnv()->GetMutex().lock();
+    ghandle.clear();
 
+    GetEnv()->GetMutex().lock();
+    robot->SetActiveDOFValues(startConfig);
     config_t currConfig = startConfig;
     path_t path;
 
@@ -518,13 +520,13 @@ void FMT::SetupSets(config_t &startCfg, path_t &path, std::ostream &sout)
 }
 
 void FMT::GenerateSamples(path_t &path, std::ostream &sout)
-{   
+{
     uint nodesAdded = 0;
     if (planner == "smart")
     {
-        for (auto & config : path)
+        for (auto &config : path)
         {
-            if(!CheckCollision(config))
+            if (!CheckCollision(config))
             {
                 nodeptr_t nodeptr = std::make_shared<Node>(config, UNVISITED);
                 unvisited.push_back(nodeptr);
@@ -534,11 +536,11 @@ void FMT::GenerateSamples(path_t &path, std::ostream &sout)
         std::cout << "Started off with " << unvisited.size() << " nodes from previous path" << std::endl;
         sout << unvisited.size() << " ";
     }
-    
+
     // Generate N-2 random samples in configuration space and add to the
     // unvistied set. Afterwards add the goal configuration to the set.
-    assert(N-2-nodesAdded > 0);
-    for (size_t i = 0; i < N-2-nodesAdded; ++i)
+    assert(N - 2 - nodesAdded > 0);
+    for (size_t i = 0; i < N - 2 - nodesAdded; ++i)
     {
         // Generate a valid configuration
         config_t config(dim, 0.0);
@@ -882,11 +884,11 @@ void FMT::CheckTriggers(const config_t &currPos)
         {
             auto x = dynobj.second.position[0];
             auto y = dynobj.second.position[1];
-            RaveVector<dReal> axis(0,0,1);
+            RaveVector<dReal> axis(0, 0, 1);
             // std::cout << "rot: " << dynobj.second.rotation << std::endl;
             auto rot = geometry::quatFromAxisAngle(axis, dynobj.second.rotation * M_PI / 180);
             // std::cout << rot << std::endl;
-            auto t = Transform(rot,{x, y, 0.74});
+            auto t = Transform(rot, {x, y, 0.74});
             GetEnv()->GetMutex().lock();
             GetEnv()->GetKinBody(dynobj.first)->SetTransform(t);
             GetEnv()->GetMutex().unlock();
