@@ -19,12 +19,12 @@ class Colors
   public:
     Colors() : counter(0)
     {
-      colors.push_back(babyblue);
-      colors.push_back(green);
-      colors.push_back(orange);
       colors.push_back(yellow);
-      colors.push_back(blue);
+      colors.push_back(green);
       colors.push_back(red);
+      colors.push_back(babyblue);
+      colors.push_back(orange);
+      colors.push_back(blue);
       colors.push_back(purple);
     }
 

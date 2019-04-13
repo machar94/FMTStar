@@ -13,8 +13,9 @@ SAMPLES  = 600
 RADIUS   = 0.5
 STEPSIZE = 0.1
 SEED     = 7
-PLANNER  = "naive"
-FWD_COLLISION_CHECK = 2
+PLANNER  = "smart"
+FWD_COLLISION_CHECK = 1
+SAMPLEBIAS = 80;
 TRIGGER1 = "2.0 Table3 3.1 0.1 90 Table4 4.2 0.0 0"
 TRIGGER2 = "-2.0 Table1 -0.3 0.7 90 Table2 0.5 -1.2 0 "
 GOAL_CONFIG  = [2.6,1.3]
@@ -35,8 +36,8 @@ def tuckarms(env, robot):
     with env:
         jointnames = ['l_shoulder_lift_joint','l_elbow_flex_joint','l_wrist_flex_joint','r_shoulder_lift_joint','r_elbow_flex_joint','r_wrist_flex_joint']
         robot.SetActiveDOFs([robot.GetJoint(name).GetDOFIndex() for name in jointnames])
-        robot.SetActiveDOFValues([1.29023451,-2.32099996,-0.69800004,1.27843491,-2.32100002,-0.69799996]);
-        robot.GetController().SetDesired(robot.GetDOFValues());
+        robot.SetActiveDOFValues([1.29023451,-2.32099996,-0.69800004,1.27843491,-2.32100002,-0.69799996])
+        robot.GetController().SetDesired(robot.GetDOFValues())
     waitrobot(robot)
 
 def placeRobot(env, robot, place):
@@ -49,6 +50,7 @@ def placeRobot(env, robot, place):
 
 if __name__ == "__main__":
 
+
     env = Environment()
     env.SetViewer('qtcoin')
     collisionChecker = RaveCreateCollisionChecker(env,'ode')
@@ -60,7 +62,7 @@ if __name__ == "__main__":
     time.sleep(0.1)
     robot = env.GetRobots()[0]
     tuckarms(env,robot);
-        
+    
     # The active DOF are translation in X and Y and rotation about the Z axis of the base of the robot.
     # robot.SetActiveDOFs([],DOFAffine.X|DOFAffine.Y|DOFAffine.RotationAxis,[0,0,1])
     robot.SetActiveDOFs([],DOFAffine.X|DOFAffine.Y)
@@ -90,10 +92,11 @@ if __name__ == "__main__":
         FMTPlanner.SendCommand('SetFwdCollisionCheck ' + str(FWD_COLLISION_CHECK))
         FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER1))
         FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER2))
-
-        # FMTPlanner.SendCommand('PrintClass')
+        # FMTPlanner.SendCommand('SetSampleBias ' + str(SAMPLEBIAS))
+        FMTPlanner.SendCommand('PrintClass')
         # FMTPlanner.SendCommand('Run')
-        FMTPlanner.SendCommand('RunWithReplan')
+    result = FMTPlanner.SendCommand('RunWithReplan')
+    print result
 
     waitrobot(robot)
 
