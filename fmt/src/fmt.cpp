@@ -27,7 +27,6 @@ class FMT : public ModuleBase
     int seed;
     std::string planner;
     uint fwdCollisionCheck;
-    double sampleBiasPercentage;
 
     std::vector<dReal> startConfig;
     std::vector<dReal> goalConfig;
@@ -106,8 +105,6 @@ class FMT : public ModuleBase
     bool SetSeed(std::ostream &sout, std::istream &sinput);
 
     bool SetPlanner(std::ostream &sout, std::istream &sinput);
-
-    bool SetSampleBias(std::ostream &sout, std::istream &sinput);
 
     bool CreateTrigger(std::ostream &sout, std::istream &sinput);
 
@@ -202,7 +199,7 @@ void GetPluginAttributesValidated(PLUGININFO &info)
 OPENRAVE_PLUGIN_API void DestroyPlugin() {}
 
 FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
-    : ModuleBase(penv), N(0.0), dim(0), stepSize(0.1), seed(-1), planner("naive"), sampleBiasPercentage(100), colors(Colors())
+    : ModuleBase(penv), N(0.0), dim(0), stepSize(0.1), seed(-1), planner("naive"), colors(Colors())
 {
     RegisterCommand("Init", boost::bind(&FMT::Init, this, _1, _2),
                     "Initializes the Planner");
@@ -222,8 +219,6 @@ FMT::FMT(EnvironmentBasePtr penv, std::istream &ss)
                     "Sets the random seed to be used for the simulation");
     RegisterCommand("SetPlanner", boost::bind(&FMT::SetPlanner, this, _1, _2),
                     "Choose either of the following: naive, smart");
-    RegisterCommand("SetSampleBias", boost::bind(&FMT::SetSampleBias, this, _1, _2),
-                    "Sets the percentage of nodes from previous path to be used");
     RegisterCommand("SetFwdCollisionCheck", boost::bind(&FMT::SetFwdCollisionCheck, this, _1, _2),
                     "When executing a trajectory, how many configuraitons forward"
                     " should the robot check to make sure it's positons are valid");
@@ -365,14 +360,6 @@ bool FMT::SetPlanner(std::ostream &sout, std::istream &sinput)
         planner = "naive";
     }
 
-    return true;
-}
-
-bool FMT::SetSampleBias(std::ostream &sout, std::istream &sinput)
-{
-    std::string val;
-    sinput >> val;
-    sampleBiasPercentage = atof(val.c_str());
     return true;
 }
 
@@ -809,7 +796,6 @@ void FMT::PrintClass_Internal()
     std::cout << "Seed: " << seed << std::endl;
     std::cout << "Planner: " << planner << std::endl;
     std::cout << "# FWD Checks: " << fwdCollisionCheck << std::endl;
-    // std::cout << "Sample Bias %: " << sampleBiasPercentage << std::endl;
 }
 
 void FMT::PlotSet(const float color[4], const nodes_t &nodes)
