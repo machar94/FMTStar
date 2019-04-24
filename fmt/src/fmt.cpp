@@ -124,7 +124,7 @@ class FMT : public ModuleBase
     void SetupSets(config_t &startCfg, path_t &path, std::ostream &sout);
 
     // Addes N-1 samples (including goal config) to unvisited set
-    void GenerateSamples(path_t &path, std::ostream &sout);
+    void GenerateSamples(std::ostream &sout);
 
     // Checks if a configuration is valid
     bool CheckCollision(const config_t &config) const;
@@ -507,55 +507,26 @@ void FMT::SetupSets(config_t &startCfg, path_t &path, std::ostream &sout)
     tree.AddNode(start);
 
     // Add valid configurations including goal to unvisited set
-    GenerateSamples(path, sout);
+    GenerateSamples(sout);
 
     // Total = open + unvisited + closed
     total = unvisited;
     total.push_back(start);
 }
 
-void FMT::GenerateSamples(path_t &path, std::ostream &sout)
+void FMT::GenerateSamples(std::ostream &sout)
 {
-    uint nodesAdded = 0;
-    if (planner == "smart")
-    {
-        for (auto &config : path)
-        {
-            if (!CheckCollision(config))
-            {
-                nodeptr_t nodeptr = std::make_shared<Node>(config, UNVISITED);
-                unvisited.push_back(nodeptr);
-                nodesAdded++;
-            }
-        }
-        std::cout << "Started off with " << unvisited.size() << " nodes from previous path" << std::endl;
-        sout << unvisited.size() << " ";
-
-        // if(path.size() != 0)
-        // {
-            // auto currPathLength = PathLength(path);
-            // double frac = currPathLength / origPathLength;
-            // N = uint(N * frac);
-        // }
-        // Update world sampling
-        // std::cout << "limits: " << robot->GetTransform().trans.x << " " << world[0][1] << std::endl;
-        // std::uniform_real_distribution<dReal> dis(robot->GetTransform().trans.x, world[0][1]);
-        // dists[0] = dis;
-    }
-
-
-    // Generate N-2-nodesAdded random samples in configuration space and add to the
+    // Generate N-2 random samples in configuration space and add to the
     // unvistied set. Afterwards add the goal configuration to the set.
-    std::cout << "Sampling " << N - 2 - nodesAdded << " nodes randomly..." << std::endl;
+    std::cout << "Sampling " << N - 2 << " nodes randomly..." << std::endl;
 
-    assert(N - 2 - nodesAdded > 0);
-    for (size_t i = 0; i < N - 2 - nodesAdded; ++i)
+    for (uint i = 0; i < N - 2; ++i)
     {
         // Generate a valid configuration
         config_t config(dim, 0.0);
         do
         {
-            for (size_t j = 0; j < dim; ++j)
+            for (uint j = 0; j < dim; ++j)
             {
                 config[j] = dists[j](gen);
             }
