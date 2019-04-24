@@ -164,6 +164,8 @@ class FMT : public ModuleBase
 
     double PathLength(const path_t &path);
 
+    void ClearCosts();
+
     void PrintClass_Internal();
 
     /* Testing Functionality */
@@ -542,9 +544,9 @@ void FMT::GenerateSamples(path_t &path, std::ostream &sout)
     }
 
 
-    // Generate N-2 random samples in configuration space and add to the
+    // Generate N-2-nodesAdded random samples in configuration space and add to the
     // unvistied set. Afterwards add the goal configuration to the set.
-    std::cout << "Sampling " << N-1 << " nodes randomly..." << std::endl;
+    std::cout << "Sampling " << N - 2 - nodesAdded << " nodes randomly..." << std::endl;
 
     assert(N - 2 - nodesAdded > 0);
     for (size_t i = 0; i < N - 2 - nodesAdded; ++i)
@@ -912,4 +914,12 @@ double FMT::PathLength(const path_t &path)
         length += CalcEuclidianDist(path[i], path[i+1]);
     }
     return length;
+}
+
+void FMT::ClearCosts()
+{
+    for (auto & node : total)
+    {
+        node->cost = 0.0;
+    }
 }

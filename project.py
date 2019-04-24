@@ -14,7 +14,7 @@ SAMPLES  = 800
 RADIUS   = 0.5
 STEPSIZE = 0.1
 SEED     = 1
-PLANNER  = "naive"
+PLANNER  = "smart"
 FWD_COLLISION_CHECK = 1
 TRIGGER1 = "2.0 Table3 3.1 0.1 90 Table4 4.2 0.0 0"
 TRIGGER2 = "-2.0 Table1 -0.3 0.7 90 Table2 0.5 -1.2 0 "
@@ -34,6 +34,7 @@ def writeToFile(timep1, reuse2, timep2, reuse3, timep3):
     np.savetxt(f_handle, reuse2, delimiter=',', fmt='%1.2f')
     np.savetxt(f_handle, reuse3, delimiter=',', fmt='%1.2f')
 
+
 def waitrobot(robot):
     """busy wait for robot completion"""
     while not robot.GetController().IsDone():
@@ -48,9 +49,11 @@ def tuckarms(env, robot):
         robot.GetController().SetDesired(robot.GetDOFValues())
     waitrobot(robot)
 
+
 def placeRobot(env, robot, place):
     with env:
         robot.SetTransform(place)
+
 
 def resetEnv(env, tables):
     with env:
@@ -59,8 +62,8 @@ def resetEnv(env, tables):
         env.GetKinBody('Table3').SetTransform(tables[2])
         env.GetKinBody('Table4').SetTransform(tables[3])
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
 
     env = Environment()
     env.SetViewer('qtcoin')
@@ -105,53 +108,51 @@ if __name__ == "__main__":
         FMTPlanner.SendCommand('SetStepSize ' + str(STEPSIZE)) 
         FMTPlanner.SendCommand('SetPlanner ' + PLANNER) 
         FMTPlanner.SendCommand('SetFwdCollisionCheck ' + str(FWD_COLLISION_CHECK))
-        # FMTPlanner.SendCommand('SetSampleBias ' + str(SAMPLEBIAS))
-        # FMTPlanner.SendCommand('SetSeed ' + str(SEED)) 
-        # FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER1))
-        # FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER2))
-        # FMTPlanner.SendCommand('PrintClass')
-        # FMTPlanner.SendCommand('Run')
-    # result = FMTPlanner.SendCommand('RunWithReplan')
-
-    timep1 = np.empty(shape=[1,0])
-    reuse2 = np.empty(shape=[1,0])
-    timep2 = np.empty(shape=[1,0])
-    reuse3 = np.empty(shape=[1,0])
-    timep3 = np.empty(shape=[1,0])
-    
-    numLoops = 0
-    while (numLoops < 2):
-        placeRobot(env, robot, robStartState)
-        resetEnv(env, tables)
-
-        print "\nSeed: %d\n" % SEED
-        FMTPlanner.SendCommand('SetSeed ' + str(SEED))
-        FMTPlanner.SendCommand('SetNumSamples ' + str(SAMPLES))
+        FMTPlanner.SendCommand('SetSeed ' + str(SEED)) 
         FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER1))
         FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER2))
-        result = FMTPlanner.SendCommand('RunWithReplan')
-        SEED = SEED + 1
-        data = [double(val) for val in result.split()]
+        # FMTPlanner.SendCommand('PrintClass')
+        # FMTPlanner.SendCommand('Run')
+    result = FMTPlanner.SendCommand('RunWithReplan')
 
-        if len(data) == 6:
-            timep1 = np.append(timep1, [[data[1]]], axis=1)
-            reuse2 = np.append(reuse2, [[data[2]]], axis=1)
-            timep2 = np.append(timep2, [[data[3]]], axis=1)
-            reuse3 = np.append(reuse3, [[data[4]]], axis=1)
-            timep3 = np.append(timep3, [[data[5]]], axis=1)
-            numLoops = numLoops + 1
-        elif (len(data) == 3):
-            timep1 = np.append(timep1, [[data[0]]], axis=1)
-            timep2 = np.append(timep2, [[data[1]]], axis=1)
-            timep3 = np.append(timep3, [[data[2]]], axis=1)
-            numLoops = numLoops + 1
+    # timep1 = np.empty(shape=[1,0])
+    # reuse2 = np.empty(shape=[1,0])
+    # timep2 = np.empty(shape=[1,0])
+    # reuse3 = np.empty(shape=[1,0])
+    # timep3 = np.empty(shape=[1,0])
+    
+    # numLoops = 0
+    # while (numLoops < 2):
+    #     placeRobot(env, robot, robStartState)
+    #     resetEnv(env, tables)
 
-        else:
-            print "Skipping Seed: " + str(SEED-1)
+    #     print "\nSeed: %d\n" % SEED
+    #     FMTPlanner.SendCommand('SetSeed ' + str(SEED))
+    #     FMTPlanner.SendCommand('SetNumSamples ' + str(SAMPLES))
+    #     FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER1))
+    #     FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER2))
+    #     result = FMTPlanner.SendCommand('RunWithReplan')
+    #     SEED = SEED + 1
+    #     data = [double(val) for val in result.split()]
 
+    #     if len(data) == 6:
+    #         timep1 = np.append(timep1, [[data[1]]], axis=1)
+    #         reuse2 = np.append(reuse2, [[data[2]]], axis=1)
+    #         timep2 = np.append(timep2, [[data[3]]], axis=1)
+    #         reuse3 = np.append(reuse3, [[data[4]]], axis=1)
+    #         timep3 = np.append(timep3, [[data[5]]], axis=1)
+    #         numLoops = numLoops + 1
+    #     elif (len(data) == 3):
+    #         timep1 = np.append(timep1, [[data[0]]], axis=1)
+    #         timep2 = np.append(timep2, [[data[1]]], axis=1)
+    #         timep3 = np.append(timep3, [[data[2]]], axis=1)
+    #         numLoops = numLoops + 1
+
+    #     else:
+    #         print "Skipping Seed: " + str(SEED-1)
 
     waitrobot(robot)
 
-    writeToFile(timep1, reuse2, timep2, reuse3, timep3)
+    # writeToFile(timep1, reuse2, timep2, reuse3, timep3)
 
     raw_input("Press enter to exit...")
