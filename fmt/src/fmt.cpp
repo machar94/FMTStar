@@ -82,7 +82,7 @@ class FMT : public ModuleBase
     nodeptr_t currNode;
 
     Colors colors;
-    OpenRAVE::EnvironmentMutex lock;
+    double origPathLength;
 
   public:
     FMT(EnvironmentBasePtr penv, std::istream &ss);
@@ -164,6 +164,8 @@ class FMT : public ModuleBase
     // moment the x position of the robot in the world coordinate sytem crosses
     // the trigger point, the environment is updated based on the trigger class
     void CheckTriggers(const config_t &currPos);
+
+    double PathLength(const path_t &path);
 
     void PrintClass_Internal();
 
@@ -461,6 +463,7 @@ bool FMT::Run(std::ostream &sout, std::istream &sinput)
 bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
 {
     ghandle.clear();
+    std::this_thread::sleep_for(std::chrono::milliseconds(10000));
 
     GetEnv()->GetMutex().lock();
     robot->SetActiveDOFValues(startConfig);
@@ -472,11 +475,13 @@ bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
     bool reachedGoal = false;
     while (reachedGoal == false)
     {
-        time_t startTime(time(NULL)), endTime;
+        auto begin = std::chrono::high_resolution_clock::now();
         SetupSets(currConfig, path, sout);
         bool foundPath = FindPath();
-        endTime = time(NULL);
-        sout << endTime - startTime << " ";
+        auto end = std::chrono::high_resolution_clock::now();
+        auto dur = end - begin; 
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();        
+        sout << ms << " ";
 
         if (!foundPath)
         {
@@ -485,6 +490,7 @@ bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
         }
 
         path = BuildPath();
+        origPathLength = PathLength(path);
         PlotPath(colors.GetColor(), path);
 
         reachedGoal = ExecuteMultiThreadTraj(path, currConfig);
@@ -535,10 +541,24 @@ void FMT::GenerateSamples(path_t &path, std::ostream &sout)
         }
         std::cout << "Started off with " << unvisited.size() << " nodes from previous path" << std::endl;
         sout << unvisited.size() << " ";
+
+        // if(path.size() != 0)
+        // {
+            // auto currPathLength = PathLength(path);
+            // double frac = currPathLength / origPathLength;
+            // N = uint(N * frac);
+        // }
+        // Update world sampling
+        // std::cout << "limits: " << robot->GetTransform().trans.x << " " << world[0][1] << std::endl;
+        // std::uniform_real_distribution<dReal> dis(robot->GetTransform().trans.x, world[0][1]);
+        // dists[0] = dis;
     }
+
 
     // Generate N-2 random samples in configuration space and add to the
     // unvistied set. Afterwards add the goal configuration to the set.
+    std::cout << "Sampling " << N-1 << " nodes randomly..." << std::endl;
+
     assert(N - 2 - nodesAdded > 0);
     for (size_t i = 0; i < N - 2 - nodesAdded; ++i)
     {
@@ -896,4 +916,14 @@ void FMT::CheckTriggers(const config_t &currPos)
 
         triggers.pop_back();
     }
+}
+
+double FMT::PathLength(const path_t &path)
+{
+    double length = 0.0;
+    for (unsigned i = 0; i < path.size()-1; ++i)
+    {
+        length += CalcEuclidianDist(path[i], path[i+1]);
+    }
+    return length;
 }

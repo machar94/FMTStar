@@ -10,10 +10,10 @@ import numpy as np
 
 ##### Parameters #####
 WORLD    = [-5.4, 5.4, -1.4, 1.4]
-SAMPLES  = 600 
+SAMPLES  = 800 
 RADIUS   = 0.5
 STEPSIZE = 0.1
-SEED     = 7
+SEED     = 19
 PLANNER  = "smart"
 FWD_COLLISION_CHECK = 1
 SAMPLEBIAS = 80;
@@ -114,30 +114,41 @@ if __name__ == "__main__":
         # FMTPlanner.SendCommand('Run')
     # result = FMTPlanner.SendCommand('RunWithReplan')
 
-    timep1 = np.empty(shape=[0,1])
-    reuse2 = np.empty(shape=[0,1])
-    timep2 = np.empty(shape=[0,1])
-    reuse3 = np.empty(shape=[0,1])
-    timep3 = np.empty(shape=[0,1])
+    timep1 = np.empty(shape=[1,0])
+    reuse2 = np.empty(shape=[1,0])
+    timep2 = np.empty(shape=[1,0])
+    reuse3 = np.empty(shape=[1,0])
+    timep3 = np.empty(shape=[1,0])
     
-    numLoops = 5
-    for i in xrange(0,numLoops):
+    numLoops = 0
+    while (numLoops < 2):
         placeRobot(env, robot, robStartState)
         resetEnv(env, tables)
 
         print "\nSeed: %d\n" % SEED
-        FMTPlanner.SendCommand('SetSeed ' + str(SEED)) 
+        FMTPlanner.SendCommand('SetSeed ' + str(SEED))
+        FMTPlanner.SendCommand('SetNumSamples ' + str(SAMPLES))
         FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER1))
         FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER2))
         result = FMTPlanner.SendCommand('RunWithReplan')
         SEED = SEED + 1
-
         data = [double(val) for val in result.split()]
-        timep1 = np.append(timep1, [[data[1]]], axis=0)
-        reuse2 = np.append(reuse2, [[data[2]]], axis=0)
-        timep2 = np.append(timep2, [[data[3]]], axis=0)
-        reuse3 = np.append(reuse3, [[data[4]]], axis=0)
-        timep3 = np.append(timep3, [[data[5]]], axis=0)
+
+        if len(data) == 6:
+            timep1 = np.append(timep1, [[data[1]]], axis=1)
+            reuse2 = np.append(reuse2, [[data[2]]], axis=1)
+            timep2 = np.append(timep2, [[data[3]]], axis=1)
+            reuse3 = np.append(reuse3, [[data[4]]], axis=1)
+            timep3 = np.append(timep3, [[data[5]]], axis=1)
+            numLoops = numLoops + 1
+        elif (len(data) == 3):
+            timep1 = np.append(timep1, [[data[0]]], axis=1)
+            timep2 = np.append(timep2, [[data[1]]], axis=1)
+            timep3 = np.append(timep3, [[data[2]]], axis=1)
+            numLoops = numLoops + 1
+
+        else:
+            print "Skipping Seed: " + str(SEED-1)
 
 
     waitrobot(robot)
