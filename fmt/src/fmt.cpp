@@ -116,10 +116,10 @@ class FMT : public ModuleBase
     // 1. Open set should have only start
     // 2. Closed set should be empty
     // 3. There should be N-1 configs unvisited (goal + N-2 samples)
-    void SetupSets(config_t &startCfg, bool replan, std::ostream &sout);
+    void SetupSets(config_t &startCfg, path_t &path, std::ostream &sout);
 
     // Addes N-1 samples (including goal config) to unvisited set
-    void GenerateSamples(std::ostream &sout);
+    void GenerateSamples(path_t &path, std::ostream &sout);
 
     // Checks if a configuration is valid
     bool CheckCollision(const config_t &config) const;
@@ -133,7 +133,7 @@ class FMT : public ModuleBase
     // Checks to see if the path from n1 to n2 is collision free
     bool CollisionFree(nodeptr_t &n1, nodeptr_t &n2);
 
-    bool FindPath();
+    bool FindPath(const path_t & region);
 
     path_t BuildPath();
 
@@ -162,6 +162,8 @@ class FMT : public ModuleBase
     void ClearCosts();
 
     uint GetSetSize(const nodes_t &nodes, SetType type);
+
+    bool IsNodeInGoalRegion(const nodeptr_t & node, const path_t & region);
 
     void PrintClass_Internal();
 
@@ -421,10 +423,10 @@ bool FMT::Run(std::ostream &sout, std::istream &sinput)
     // TestTriggers();
 
     // Initialize and set the open, unvisited and closed sets
-    path_t path;
-    SetupSets(startConfig, false, sout); // replan set to false
+    path_t path(1, goalConfig);
+    SetupSets(startConfig, path, sout); // replan set to false
 
-    FindPath();
+    FindPath(path);
 
     path = BuildPath();
     std::cout << "OpenSet: " << open.size() << std::endl;
@@ -442,13 +444,11 @@ bool FMT::Run(std::ostream &sout, std::istream &sinput)
 bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
 {
     ghandle.clear();
-    std::this_thread::sleep_for(std::chrono::milliseconds(10000));
 
     GetEnv()->GetMutex().lock();
     robot->SetActiveDOFValues(startConfig);
     config_t currConfig = startConfig;
-    path_t path;
-    bool replan = false;
+    path_t path(1, goalConfig); // Goal region includes only goal config originally
 
     // TestTriggers();
 
@@ -456,11 +456,10 @@ bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
     while (reachedGoal == false)
     {
         auto begin = std::chrono::high_resolution_clock::now();
-        SetupSets(currConfig, replan, sout);
+        SetupSets(currConfig, path, sout);
         printVector(currConfig);
         TestSetSizes();
-        bool foundPath = FindPath();
-        replan = true;
+        bool foundPath = FindPath(path);
         auto end = std::chrono::high_resolution_clock::now();
         auto dur = end - begin; 
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();        
@@ -486,12 +485,12 @@ bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
     return true;
 }
 
-void FMT::SetupSets(config_t &startCfg, bool replan, std::ostream &sout)
+void FMT::SetupSets(config_t &startCfg, path_t &path, std::ostream &sout)
 {
     total.clear();
     open.clearSet();
     // Add valid configurations including goal to unvisited set
-    GenerateSamples(sout);
+    GenerateSamples(path, sout);
 
     // Add start to open and total sets 
     nodeptr_t start = std::make_shared<Node>(startCfg, OPEN);
@@ -499,43 +498,33 @@ void FMT::SetupSets(config_t &startCfg, bool replan, std::ostream &sout)
         
     // Total = open + unvisited + closed
     total.push_back(start);
-
-    /*  
-    if (replan == false)
-    {
-        // Add valid configurations including goal to unvisited set
-        GenerateSamples(sout);
-
-        // Add start to open and total sets 
-        nodeptr_t start = std::make_shared<Node>(startCfg, OPEN);
-        open.push(start);
-        
-        // Total = open + unvisited + closed
-        total.push_back(start);
-    }
-    else
-    {
-        // open.clearSet();
-       
-        // Update nodes (except start) to unvisited set
-        for (auto & node : total)
-        {
-            if (node->q != startCfg)
-                node->setType = UNVISITED;
-            else
-                open.push(node);            
-        }
-    }
-    */
 }
 
-void FMT::GenerateSamples(std::ostream &sout)
+void FMT::GenerateSamples(path_t &path, std::ostream &sout)
 {
+    uint nodesAdded = 0;
+    if (planner == "smart")
+    {
+        for (auto &config : path)
+        {
+            if (!CheckCollision(config))
+            {
+                nodeptr_t nodeptr = std::make_shared<Node>(config, UNVISITED);
+                total.push_back(nodeptr);
+                nodesAdded++;
+            }
+        }
+        std::cout << "\n\nStarted off with " << total.size() << " nodes from previous path" << std::endl;
+        sout << total.size() << " ";
+    }
+
+    
     // Generate N-2 random samples in configuration space and add to the
     // unvistied set. Afterwards add the goal configuration to the set.
-    std::cout << "Sampling " << N - 2 << " nodes randomly..." << std::endl;
-
-    for (uint i = 0; i < N - 2; ++i)
+    std::cout << "Sampling " << N - 2 - nodesAdded << " nodes randomly..." << std::endl;
+    
+    assert(N - 2 - nodesAdded > 0);
+    for (uint i = 0; i < N - 2 - nodesAdded; ++i)
     {
         // Generate a valid configuration
         config_t config(dim, 0.0);
@@ -638,12 +627,12 @@ bool FMT::CollisionFree(nodeptr_t &n1, nodeptr_t &n2)
     }
 }
 
-bool FMT::FindPath()
+bool FMT::FindPath(const path_t & region)
 {
     // Set init to the current node
     currNode = open.top();
 
-    while (currNode->q != goalConfig)
+    while (IsNodeInGoalRegion(currNode, region) == false)
     {
         nodes_t open_new;
 
@@ -920,5 +909,21 @@ void FMT::ClearCosts()
     for (auto & node : total)
     {
         node->cost = 0.0;
+        nodeptr_t nullParent;
+        node->parent = nullParent;
+        node->setType = UNVISITED;
     }
+}
+
+bool FMT::IsNodeInGoalRegion(const nodeptr_t & node, const path_t & region)
+{
+    for (const auto & goal : region)
+    {
+        if (node->q == goal)
+        {
+            std::cout << "Joining previous path" << std::endl;
+            return true;
+        }
+    }
+    return false;
 }
