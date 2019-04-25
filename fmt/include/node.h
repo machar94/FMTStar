@@ -12,6 +12,8 @@ using config_t = std::vector<dReal>;
 class Node;
 using nodeptr_t = std::shared_ptr<Node>;
 
+using nodes_t = std::vector<nodeptr_t>;
+
 enum SetType
 {
     OPEN,

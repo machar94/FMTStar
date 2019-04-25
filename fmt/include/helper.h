@@ -5,8 +5,7 @@
 #include <vector>
 #include <assert.h>
 #include <unordered_map>
-
-#include <tree.h>
+#include <node.h>
 
 template <class T>
 inline void printVector(const std::vector<T> &vec)

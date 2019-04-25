@@ -2,7 +2,6 @@
 #define FMT_HPP
 
 #include <helper.h>
-#include <tree.h>
 
 static const float red[4] = {1, 0, 0, 1};
 static const float blue[4] = {0, 0, 1, 1};

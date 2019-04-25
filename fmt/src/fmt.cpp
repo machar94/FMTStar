@@ -24,6 +24,7 @@ class FMT : public ModuleBase
     size_t dim;
     double radius; // Radius for nearest neighbor search
     double stepSize;
+    double origPathLength;
     int seed;
     std::string planner;
     uint fwdCollisionCheck;
@@ -32,12 +33,11 @@ class FMT : public ModuleBase
     std::vector<dReal> goalConfig;
     std::vector<std::vector<dReal>> world;
     nodeptr_t goalNode;
+    nodeptr_t currNode;
 
     std::mt19937 gen; // random number generator
     std::vector<std::uniform_real_distribution<dReal>> dists;
 
-    nodes_t closed;
-    nodes_t unvisited;
     nodes_t total; // total = open + closed + unvisited
 
     // Handle to all of the points being plotted
@@ -71,17 +71,12 @@ class FMT : public ModuleBase
         }
     };
 
-    OpenSet open;
-
-    Tree tree;
     RobotBasePtr robot;
 
     std::unordered_map<nodeptr_t, nodes_t> neighborTable;
-
-    nodeptr_t currNode;
-
+    
+    OpenSet open;
     Colors colors;
-    double origPathLength;
 
   public:
     FMT(EnvironmentBasePtr penv, std::istream &ss);
@@ -120,8 +115,8 @@ class FMT : public ModuleBase
     // Initialize open, closed and unvisited sets
     // 1. Open set should have only start
     // 2. Closed set should be empty
-    // 3. Unvisited should have N-1 configs (goal + N-2 samples)
-    void SetupSets(config_t &startCfg, path_t &path, std::ostream &sout);
+    // 3. There should be N-1 configs unvisited (goal + N-2 samples)
+    void SetupSets(config_t &startCfg, bool replan, std::ostream &sout);
 
     // Addes N-1 samples (including goal config) to unvisited set
     void GenerateSamples(std::ostream &sout);
@@ -144,7 +139,7 @@ class FMT : public ModuleBase
 
     void PlotPath(const float color[4], path_t &path);
 
-    void PlotSet(const float color[4], const nodes_t &nodes);
+    void PlotSet(const float color[4], const nodes_t &nodes, SetType type);
 
     void ExecuteTrajectory(path_t &path, config_t &startCfg);
 
@@ -165,6 +160,8 @@ class FMT : public ModuleBase
     double PathLength(const path_t &path);
 
     void ClearCosts();
+
+    uint GetSetSize(const nodes_t &nodes, SetType type);
 
     void PrintClass_Internal();
 
@@ -303,8 +300,7 @@ bool FMT::SetNumSamples(std::ostream &sout, std::istream &sinput)
     std::string numSamples;
     sinput >> numSamples;
     N = atoi(numSamples.c_str());
-
-    tree.Reserve(N);
+    total.reserve(N);
 
     return true;
 }
@@ -396,27 +392,21 @@ void FMT::TestOpenSet()
     nodeptr_t noParent;
     nodeptr_t node = std::make_shared<Node>(startConfig, noParent);
 
-    // Add the start node to the tree
-    tree.AddNode(node);
-
-    for (size_t i = 0; i < numNodes; ++i)
+    for (uint i = 0; i < numNodes; ++i)
     {
         config_t q;
-        for (size_t j = 0; j < dim; ++j)
+        for (uint j = 0; j < dim; ++j)
         {
             q.push_back(dists[j](gen));
         }
         node = std::make_shared<Node>(q, noParent);
-        tree.AddNode(node);
 
         node->cost = numNodes - i;
         open.push(node);
     }
 
-    tree.PrintNodes();
-
     std::cout << "\nNodes in Open Set:\n";
-    for (size_t i = 0; i < numNodes; ++i)
+    for (uint i = 0; i < numNodes; ++i)
     {
         std::cout << *open.top();
         open.pop();
@@ -432,14 +422,14 @@ bool FMT::Run(std::ostream &sout, std::istream &sinput)
 
     // Initialize and set the open, unvisited and closed sets
     path_t path;
-    SetupSets(startConfig, path, sout);
+    SetupSets(startConfig, false, sout); // replan set to false
 
     FindPath();
 
     path = BuildPath();
     std::cout << "OpenSet: " << open.size() << std::endl;
-    PlotSet(colors.GetColor(), closed);
-    PlotSet(colors.GetColor(), unvisited);
+    PlotSet(colors.GetColor(), total, CLOSED);
+    PlotSet(colors.GetColor(), total, UNVISITED);
     PlotPath(colors.GetColor(), path);
     TestSetSizes();
 
@@ -458,6 +448,7 @@ bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
     robot->SetActiveDOFValues(startConfig);
     config_t currConfig = startConfig;
     path_t path;
+    bool replan = false;
 
     // TestTriggers();
 
@@ -465,8 +456,11 @@ bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
     while (reachedGoal == false)
     {
         auto begin = std::chrono::high_resolution_clock::now();
-        SetupSets(currConfig, path, sout);
+        SetupSets(currConfig, replan, sout);
+        printVector(currConfig);
+        TestSetSizes();
         bool foundPath = FindPath();
+        replan = true;
         auto end = std::chrono::high_resolution_clock::now();
         auto dur = end - begin; 
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();        
@@ -492,26 +486,47 @@ bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
     return true;
 }
 
-void FMT::SetupSets(config_t &startCfg, path_t &path, std::ostream &sout)
+void FMT::SetupSets(config_t &startCfg, bool replan, std::ostream &sout)
 {
-    // Empty tree, open set, unvisited, closed, total
-    open.clearSet();
-    tree.ClearTree();
-    unvisited.clear();
-    closed.clear();
     total.clear();
-
-    nodeptr_t nullParent;
-    nodeptr_t start = std::make_shared<Node>(startCfg, nullParent);
-    open.push(start);
-    tree.AddNode(start);
-
+    open.clearSet();
     // Add valid configurations including goal to unvisited set
     GenerateSamples(sout);
 
+    // Add start to open and total sets 
+    nodeptr_t start = std::make_shared<Node>(startCfg, OPEN);
+    open.push(start);
+        
     // Total = open + unvisited + closed
-    total = unvisited;
     total.push_back(start);
+
+    /*  
+    if (replan == false)
+    {
+        // Add valid configurations including goal to unvisited set
+        GenerateSamples(sout);
+
+        // Add start to open and total sets 
+        nodeptr_t start = std::make_shared<Node>(startCfg, OPEN);
+        open.push(start);
+        
+        // Total = open + unvisited + closed
+        total.push_back(start);
+    }
+    else
+    {
+        // open.clearSet();
+       
+        // Update nodes (except start) to unvisited set
+        for (auto & node : total)
+        {
+            if (node->q != startCfg)
+                node->setType = UNVISITED;
+            else
+                open.push(node);            
+        }
+    }
+    */
 }
 
 void FMT::GenerateSamples(std::ostream &sout)
@@ -533,14 +548,15 @@ void FMT::GenerateSamples(std::ostream &sout)
 
         } while (CheckCollision(config));
 
-        // Create node and push it on to the unvisited nodes list
+        // Mark node as unvisited and push to total set
         nodeptr_t nodeptr = std::make_shared<Node>(config, UNVISITED);
-        unvisited.push_back(nodeptr);
+        total.push_back(nodeptr);
     }
 
-    // Goal configuration needs to be in free space
+    // Check that goal configuration is in free space
+    assert(CheckCollision(goalConfig) == false);
     nodeptr_t nodeptr = std::make_shared<Node>(goalConfig, UNVISITED);
-    unvisited.push_back(nodeptr);
+    total.push_back(nodeptr);
 }
 
 bool FMT::CheckCollision(const config_t &config) const
@@ -557,9 +573,22 @@ void FMT::TestSetSizes()
 {
     std::cout << "\nPrinting out the size of the sets...\n";
     std::cout << "OpenSet  : " << open.size() << std::endl;
-    std::cout << "ClosedSet: " << closed.size() << std::endl;
-    std::cout << "Unvisited: " << unvisited.size() << std::endl;
+    std::cout << "Closed   : " << GetSetSize(total, CLOSED) << std::endl;
+    std::cout << "Unvisited: " << GetSetSize(total, UNVISITED) << std::endl;
     std::cout << "Total    : " << total.size() << std::endl;
+}
+
+uint FMT::GetSetSize(const nodes_t &nodes, SetType type)
+{
+    uint count = 0;
+    for (const auto & node : nodes)
+    {
+        if (node->setType == type)
+        {
+            count++;
+        }
+    }
+    return count;
 }
 
 nodeptr_t FMT::FindClosestNodeInOpen(
@@ -637,17 +666,12 @@ bool FMT::FindPath()
 
             if (CollisionFree(yMin, currNN[i]))
             {
-                // Add node x to tree and add its parent is yMin
+                // Update node x's parent to yMin
                 currNN[i]->parent = yMin;
-                tree.AddNode(currNN[i]);
 
                 // Add node x to the open_new set
                 // Wait to change to open
                 open_new.push_back(currNN[i]);
-
-                // Remove node x from unvisited and change to open
-                auto it = std::remove(unvisited.begin(), unvisited.end(), currNN[i]);
-                unvisited.erase(it, unvisited.end());
 
                 // Update cost of node x (y->x) + cost(y)
                 currNN[i]->cost = yMin->cost + CalcEuclidianDist(yMin, currNN[i]);
@@ -656,12 +680,12 @@ bool FMT::FindPath()
 
         // Update closed list: Vclosed U {Z}
         currNode->setType = CLOSED;
-        closed.push_back(currNode);
 
         // Update open list: (Vopen U Vopen_new) \ {z}
         open.pop();
         for (auto &node : open_new)
         {
+            // Nodes go from unvisited set to open set
             open.push(node);
         }
 
@@ -771,16 +795,20 @@ void FMT::PrintClass_Internal()
     std::cout << "# FWD Checks: " << fwdCollisionCheck << std::endl;
 }
 
-void FMT::PlotSet(const float color[4], const nodes_t &nodes)
+void FMT::PlotSet(const float color[4], const nodes_t &nodes, SetType type)
 {
     std::vector<float> p(3, 0.05);
     for (const auto &node : nodes)
     {
-        p[0] = node->q[0];
-        p[1] = node->q[1];
-        ghandle.push_back(GetEnv()->plot3(&p[0], 1, 12, 5, color, 0));
+        if (node->setType == type)
+        {
+            p[0] = node->q[0];
+            p[1] = node->q[1];
+            ghandle.push_back(GetEnv()->plot3(&p[0], 1, 12, 5, color, 0));
+        }
     }
 }
+
 void FMT::TestTriggers()
 {
     std::cout << "Printing out Triggers..." << std::endl;

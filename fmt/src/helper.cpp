@@ -1,5 +1,4 @@
 #include <cmath>
-
 #include <helper.h>
 
 double CalcEuclidianDist(const nodeptr_t &n1, const nodeptr_t &n2)
@@ -69,4 +68,19 @@ config_t operator+(const config_t &v1, const config_t &v2)
         v3[i] = v1[i] + v2[i];
     }
     return v3;
+}
+
+void PrintNodes(const nodes_t &nodes)
+{
+    std::cout << "Nodes in list:" << std::endl;
+    for (uint i = 0; i < nodes.size(); ++i)
+    {
+        std::cout << "Point " << i << ": ";
+        for (uint j = 0; j < nodes[i]->q.size() - 1; ++j)
+        {
+            std::cout << nodes[i]->q[j] << ", ";
+        }
+        std::cout << nodes[i]->q.back() << " | ";
+        std::cout << "Cost: " << nodes[i]->cost << std::endl;
+    }
 }
