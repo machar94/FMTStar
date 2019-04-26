@@ -9,8 +9,8 @@ import os
 import numpy as np
 
 ##### Parameters #####
-WORLD    = [-5.4, 5.4, -1.4, 1.4]
-SAMPLES  = 800 
+WORLD    = [-8.4, 8.4, -2.4, 2.4]
+SAMPLES  = 2000 
 RADIUS   = 0.5
 STEPSIZE = 0.1
 SEED     = 1
@@ -18,7 +18,7 @@ PLANNER  = "smart"
 FWD_COLLISION_CHECK = 1
 TRIGGER1 = "2.0 Table3 3.1 0.1 90 Table4 4.2 0.0 0"
 TRIGGER2 = "-2.0 Table1 -0.3 0.7 90 Table2 0.5 -1.2 0 "
-GOAL_CONFIG  = [2.6,1.3]
+GOAL_CONFIG  = [7.0, 2.3]
 FILENAME = "stats.txt"
 
 if not __openravepy_build_doc__:
@@ -33,6 +33,11 @@ def writeToFile(timep1, reuse2, timep2, reuse3, timep3):
     np.savetxt(f_handle, timep3, delimiter=',', fmt='%1.2f')
     np.savetxt(f_handle, reuse2, delimiter=',', fmt='%1.2f')
     np.savetxt(f_handle, reuse3, delimiter=',', fmt='%1.2f')
+
+    try:
+        os.remove(FILENAME)
+    except OSError:
+        pass
 
 
 def waitrobot(robot):
@@ -71,28 +76,25 @@ if __name__ == "__main__":
     env.SetCollisionChecker(collisionChecker)
 
     env.Reset()
-    env.Load('./envs/cups.env.xml')
-    # env.Load('four-chambers.env.xml')
+    env.Load('./envs/large-chamber.env.xml')
     time.sleep(0.1)
     robot = env.GetRobots()[0]
-    tuckarms(env,robot);
     
-    # The active DOF are translation in X and Y and rotation about the Z axis of the base of the robot.
-    # robot.SetActiveDOFs([],DOFAffine.X|DOFAffine.Y|DOFAffine.RotationAxis,[0,0,1])
-    robot.SetActiveDOFs([],DOFAffine.X|DOFAffine.Y)
-        
-    robStartState = robot.GetTransform()
-    # tables = []
-    # tables.append(env.GetKinBody('Table1').GetTransform())
-    # tables.append(env.GetKinBody('Table2').GetTransform())
-    # tables.append(env.GetKinBody('Table3').GetTransform())
-    # tables.append(env.GetKinBody('Table4').GetTransform())
-
-    startConfig = robot.GetTransform()[0:2,3].tolist()
-
     RaveLoadPlugin('fmt/build/fmt')
     FMTPlanner = RaveCreateModule(env, 'FMT')
     env.AddModule(FMTPlanner,args='')
+    tuckarms(env,robot);
+
+    # The active DOF are translation in X and Y and rotation about the Z axis of the base of the robot.
+    # robot.SetActiveDOFs([],DOFAffine.X|DOFAffine.Y|DOFAffine.RotationAxis,[0,0,1])
+    robot.SetActiveDOFs([],DOFAffine.X|DOFAffine.Y)
+    startConfig = robot.GetTransform()[0:2,3].tolist()
+
+    tables = []
+    tables.append(env.GetKinBody('Table1').GetTransform())
+    tables.append(env.GetKinBody('Table2').GetTransform())
+    tables.append(env.GetKinBody('Table3').GetTransform())
+    tables.append(env.GetKinBody('Table4').GetTransform())
     
     startConfigStr = ' '.join([str(e) for e in startConfig])
     goalConfigStr  = ' '.join([str(e) for e in GOAL_CONFIG])
@@ -111,48 +113,11 @@ if __name__ == "__main__":
         FMTPlanner.SendCommand('SetSeed ' + str(SEED)) 
         FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER1))
         FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER2))
-        # FMTPlanner.SendCommand('PrintClass')
+        FMTPlanner.SendCommand('PrintClass')
         # FMTPlanner.SendCommand('Run')
-    # result = FMTPlanner.SendCommand('RunWithReplan')
+    result = FMTPlanner.SendCommand('RunWithReplan')
 
-    # timep1 = np.empty(shape=[1,0])
-    # reuse2 = np.empty(shape=[1,0])
-    # timep2 = np.empty(shape=[1,0])
-    # reuse3 = np.empty(shape=[1,0])
-    # timep3 = np.empty(shape=[1,0])
-    
-    # numLoops = 0
-    # while (numLoops < 2):
-    #     placeRobot(env, robot, robStartState)
-    #     resetEnv(env, tables)
-
-    #     print "\nSeed: %d\n" % SEED
-    #     FMTPlanner.SendCommand('SetSeed ' + str(SEED))
-    #     FMTPlanner.SendCommand('SetNumSamples ' + str(SAMPLES))
-    #     FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER1))
-    #     FMTPlanner.SendCommand('CreateTrigger ' + str(TRIGGER2))
-    #     result = FMTPlanner.SendCommand('RunWithReplan')
-    #     SEED = SEED + 1
-    #     data = [double(val) for val in result.split()]
-
-    #     if len(data) == 6:
-    #         timep1 = np.append(timep1, [[data[1]]], axis=1)
-    #         reuse2 = np.append(reuse2, [[data[2]]], axis=1)
-    #         timep2 = np.append(timep2, [[data[3]]], axis=1)
-    #         reuse3 = np.append(reuse3, [[data[4]]], axis=1)
-    #         timep3 = np.append(timep3, [[data[5]]], axis=1)
-    #         numLoops = numLoops + 1
-    #     elif (len(data) == 3):
-    #         timep1 = np.append(timep1, [[data[0]]], axis=1)
-    #         timep2 = np.append(timep2, [[data[1]]], axis=1)
-    #         timep3 = np.append(timep3, [[data[2]]], axis=1)
-    #         numLoops = numLoops + 1
-
-    #     else:
-    #         print "Skipping Seed: " + str(SEED-1)
 
     waitrobot(robot)
-
-    # writeToFile(timep1, reuse2, timep2, reuse3, timep3)
 
     raw_input("Press enter to exit...")

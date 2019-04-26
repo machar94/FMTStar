@@ -467,6 +467,9 @@ bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
 
         if (!foundPath)
         {
+
+            // PlotSet(colors.GetColor(), total, CLOSED);
+            // PlotSet(colors.GetColor(), total, UNVISITED);
             std::cout << "Unable to find a path!" << std::endl;
             break;
         }
