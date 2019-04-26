@@ -22,17 +22,21 @@ void FindNearestNeighbors(
     nodes_t &neighbors,
     nodeptr_t &curr,
     double radius,
+    const std::vector<double> &w,
     std::unordered_map<nodeptr_t, nodes_t> &neighborTable);
 
-double CalcEuclidianDist(const nodeptr_t &q1, const nodeptr_t &q2);
+double CalcEuclidianDist(const nodeptr_t &q1, const nodeptr_t &q2, const std::vector<double> &w);
 
-double CalcEuclidianDist(const config_t &q1, const config_t &q2);
+double CalcEuclidianDist(const config_t &q1, const config_t &q2, const std::vector<double> &w);
 
 std::vector<dReal> CalcDirVector(
     const config_t &v1, 
     const config_t &v2,
+    const std::vector<double> &w,
     double stepSize);
 
 config_t operator+(const config_t &v1, const config_t &v2);
+
+void normalizeWeights(std::vector<double> & weights);
 
 #endif

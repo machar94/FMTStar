@@ -1,17 +1,23 @@
 #include <cmath>
 #include <helper.h>
 
-double CalcEuclidianDist(const nodeptr_t &n1, const nodeptr_t &n2)
+double CalcEuclidianDist(
+    const nodeptr_t &n1, 
+    const nodeptr_t &n2, 
+    const std::vector<double> &w)
 {
-    return CalcEuclidianDist(n1->q, n2->q);
+    return CalcEuclidianDist(n1->q, n2->q, w);
 }
 
-double CalcEuclidianDist(const config_t &q1, const config_t &q2)
+double CalcEuclidianDist(
+    const config_t &q1, 
+    const config_t &q2, 
+    const std::vector<double> &w)
 {
     double sum = 0.0;
     for (size_t i = 0; i < q1.size(); ++i)
     {
-        sum += (q1[i] - q2[i]) * (q1[i] - q2[i]);
+        sum += w[i] * (q1[i] - q2[i]) * (q1[i] - q2[i]);
     }
     return sqrtf(sum);
 }
@@ -21,6 +27,7 @@ void FindNearestNeighbors(
     nodes_t &neighbors,
     nodeptr_t &curr,
     double radius,
+    const std::vector<double> &w,
     std::unordered_map<nodeptr_t, nodes_t> &neighborTable)
 {
     assert(neighbors.size() == 0);
@@ -35,7 +42,7 @@ void FindNearestNeighbors(
     {
         for (auto &node : set)
         {
-            double dist = CalcEuclidianDist(curr->q, node->q);
+            double dist = CalcEuclidianDist(curr->q, node->q, w);
             if (dist < radius && curr != node)
             {
                 neighbors.push_back(node);
@@ -48,10 +55,11 @@ void FindNearestNeighbors(
 std::vector<dReal> CalcDirVector(
     const config_t &v1, 
     const config_t &v2,
+    const std::vector<double> &w,
     double stepSize)
 {
     std::vector<dReal> dir(v2.size(), 0.0);
-    double dist = CalcEuclidianDist(v1, v2);
+    double dist = CalcEuclidianDist(v1, v2, w);
 
     for (size_t i = 0; i < v2.size(); ++i)
     {
@@ -82,5 +90,18 @@ void PrintNodes(const nodes_t &nodes)
         }
         std::cout << nodes[i]->q.back() << " | ";
         std::cout << "Cost: " << nodes[i]->cost << std::endl;
+    }
+}
+
+void normalizeWeights(std::vector<double> &weights)
+{
+    double sum = 0.0;
+    for (const auto &val : weights)
+    {
+        sum += val;
+    }
+    for (auto & val : weights)
+    {
+        val /= sum;
     }
 }

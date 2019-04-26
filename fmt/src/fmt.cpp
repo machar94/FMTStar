@@ -18,6 +18,8 @@
 
 using namespace OpenRAVE;
 
+static std::vector<double> weights = {0.1, 1.0, 1.0};
+
 class FMT : public ModuleBase
 {
     size_t N; // Number of samples
@@ -252,6 +254,13 @@ bool FMT::Init(std::ostream &sout, std::istream &sinput)
         gen.seed(seed);
     }
 
+    normalizeWeights(weights);
+    for (auto & val : weights)
+    {
+        std::cout << val << " ";
+    }
+    std::cout << std::endl;
+
     return true;
 }
 
@@ -286,7 +295,7 @@ bool FMT::DefineWorld(std::ostream &sout, std::istream &sinput)
         world.push_back(limits);
     }
 
-    dim = world[0].size();
+    dim = world.size();
 
     // Setup random number generators for sampling
     for (unsigned i = 0; i < world.size(); ++i)
@@ -475,7 +484,7 @@ bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
         }
 
         path = BuildPath(path);
-        origPathLength = PathLength(path);
+        //origPathLength = PathLength(path);
         PlotPath(colors.GetColor(), path);
 
         reachedGoal = ExecuteMultiThreadTraj(path, currConfig);
@@ -600,7 +609,7 @@ nodeptr_t FMT::FindClosestNodeInOpen(
             continue;
         }
 
-        double cost = CalcEuclidianDist(node, curr);
+        double cost = CalcEuclidianDist(node, curr, weights);
         // Node represents y's cost to come in tree
         if ((cost + node->cost) < minCost)
         {
@@ -615,11 +624,11 @@ nodeptr_t FMT::FindClosestNodeInOpen(
 bool FMT::CollisionFree(nodeptr_t &n1, nodeptr_t &n2)
 {
     config_t q1 = n1->q, q2 = n2->q;
-    auto dir = CalcDirVector(q1, q2, stepSize);
+    auto dir = CalcDirVector(q1, q2, weights, stepSize);
 
     while (true)
     {
-        double dist = CalcEuclidianDist(q1, q2);
+        double dist = CalcEuclidianDist(q1, q2, weights);
         if (dist < stepSize)
         {
             return true;
@@ -635,16 +644,21 @@ bool FMT::CollisionFree(nodeptr_t &n1, nodeptr_t &n2)
 
 bool FMT::FindPath(const path_t & region)
 {
+    static int nodeCount = 1;
     // Set init to the current node
     currNode = open.top();
 
     while (IsNodeInGoalRegion(currNode, region) == false)
     {
+        if (nodeCount % 50 == 0)
+        {
+            std::cout << "Processing " << nodeCount << std::endl;
+        }
         nodes_t open_new;
 
         // Other than start config, should always find neighbors through table
         nodes_t currNN;
-        FindNearestNeighbors(total, currNN, currNode, radius, neighborTable);
+        FindNearestNeighbors(total, currNN, currNode, radius, weights, neighborTable);
 
         // Only perform wiring for nodes in unvisited set
         for (size_t i = 0; i < currNN.size(); ++i)
@@ -655,7 +669,7 @@ bool FMT::FindPath(const path_t & region)
             }
 
             nodes_t xNN; // Neighbor x's nearest neighbors
-            FindNearestNeighbors(total, xNN, currNN[i], radius, neighborTable);
+            FindNearestNeighbors(total, xNN, currNN[i], radius, weights, neighborTable);
 
             nodeptr_t yMin = FindClosestNodeInOpen(xNN, currNN[i]);
 
@@ -669,7 +683,7 @@ bool FMT::FindPath(const path_t & region)
                 open_new.push_back(currNN[i]);
 
                 // Update cost of node x (y->x) + cost(y)
-                currNN[i]->cost = yMin->cost + CalcEuclidianDist(yMin, currNN[i]);
+                currNN[i]->cost = yMin->cost + CalcEuclidianDist(yMin, currNN[i], weights);
             }
         }
 
@@ -689,6 +703,7 @@ bool FMT::FindPath(const path_t & region)
             return false;
         }
         currNode = open.top();
+        nodeCount++;
     }
 
     goalNode = currNode;
@@ -746,8 +761,8 @@ void FMT::PlotPath(const float color[4], path_t &path)
     std::vector<float> p(3, 0.05);
     for (auto it = path.rbegin(); it != path.rend(); ++it)
     {
-        p[0] = (*it)[0];
-        p[1] = (*it)[1];
+        p[0] = (*it)[dim-2];
+        p[1] = (*it)[dim-1];
         ghandle.push_back(GetEnv()->plot3(&p[0], 1, 12, 8, color, 0));
     }
 }
@@ -765,8 +780,8 @@ void FMT::ExecuteTrajectory(path_t &path, config_t &startCfg)
         traj->Insert(i, *it);
         i++;
     }
-    std::vector<double> maxVel(2, 1.0);
-    std::vector<double> maxAcc(2, 5.0);
+    std::vector<double> maxVel(3, 1.0);
+    std::vector<double> maxAcc(3, 2.0);
     OpenRAVE::planningutils::RetimeAffineTrajectory(traj, maxVel, maxAcc);
     robot->GetController()->SetPath(traj);
 
@@ -863,6 +878,7 @@ bool FMT::ExecuteMultiThreadTraj(path_t &path, config_t &startCfg)
         {
             return reachedGoal;
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
         // Step 3. Execute trajectory that was validated to be free
         // Send in small path in reverse to execute trajectory since it uses reverse iterators
@@ -920,7 +936,7 @@ double FMT::PathLength(const path_t &path)
     double length = 0.0;
     for (unsigned i = 0; i < path.size()-1; ++i)
     {
-        length += CalcEuclidianDist(path[i], path[i+1]);
+        length += CalcEuclidianDist(path[i], path[i+1], weights);
     }
     return length;
 }
