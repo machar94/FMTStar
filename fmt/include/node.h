@@ -31,9 +31,9 @@ class Node
     double    cost;
 
   public:
-    Node(config_t &config, SetType t = INVALID, double c = 0.0); 
+    Node(const config_t &config, SetType t = INVALID, double c = 0.0); 
 
-    Node(config_t &config, nodeptr_t &parent, SetType t = INVALID, double c = 0.0);
+    Node(const config_t &config, nodeptr_t &parent, SetType t = INVALID, double c = 0.0);
 
     void SetParent(nodeptr_t &p)
     {

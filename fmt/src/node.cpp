@@ -1,11 +1,11 @@
 #include <node.h>
 
-Node::Node(config_t &config, SetType t, double c)
+Node::Node(const config_t &config, SetType t, double c)
     : q(config), parent(nodeptr_t()), setType(t), cost(c)
 {
 }
 
-Node::Node(config_t &config, nodeptr_t &p, SetType t, double c)
+Node::Node(const config_t &config, nodeptr_t &p, SetType t, double c)
     : q(config), parent(p), setType(t), cost(c)
 {
 }

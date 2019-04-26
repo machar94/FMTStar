@@ -116,10 +116,10 @@ class FMT : public ModuleBase
     // 1. Open set should have only start
     // 2. Closed set should be empty
     // 3. There should be N-1 configs unvisited (goal + N-2 samples)
-    void SetupSets(config_t &startCfg, path_t &path, std::ostream &sout);
+    void SetupSets(config_t &startCfg, const path_t &path, std::ostream &sout);
 
     // Addes N-1 samples (including goal config) to unvisited set
-    void GenerateSamples(path_t &path, std::ostream &sout);
+    void GenerateSamples(const path_t &path, std::ostream &sout);
 
     // Checks if a configuration is valid
     bool CheckCollision(const config_t &config) const;
@@ -135,7 +135,7 @@ class FMT : public ModuleBase
 
     bool FindPath(const path_t & region);
 
-    path_t BuildPath();
+    path_t BuildPath(path_t &oldpath);
 
     void PlotPath(const float color[4], path_t &path);
 
@@ -428,7 +428,7 @@ bool FMT::Run(std::ostream &sout, std::istream &sinput)
 
     FindPath(path);
 
-    path = BuildPath();
+    path = BuildPath(path);
     std::cout << "OpenSet: " << open.size() << std::endl;
     PlotSet(colors.GetColor(), total, CLOSED);
     PlotSet(colors.GetColor(), total, UNVISITED);
@@ -471,7 +471,7 @@ bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
             break;
         }
 
-        path = BuildPath();
+        path = BuildPath(path);
         origPathLength = PathLength(path);
         PlotPath(colors.GetColor(), path);
 
@@ -485,7 +485,7 @@ bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
     return true;
 }
 
-void FMT::SetupSets(config_t &startCfg, path_t &path, std::ostream &sout)
+void FMT::SetupSets(config_t &startCfg, const path_t &path, std::ostream &sout)
 {
     total.clear();
     open.clearSet();
@@ -500,16 +500,19 @@ void FMT::SetupSets(config_t &startCfg, path_t &path, std::ostream &sout)
     total.push_back(start);
 }
 
-void FMT::GenerateSamples(path_t &path, std::ostream &sout)
+void FMT::GenerateSamples(const path_t &path, std::ostream &sout)
 {
     uint nodesAdded = 0;
     if (planner == "smart")
     {
-        for (auto &config : path)
+        // path[0] is assumed to be goal configuration always
+        assert(path.size() > 0);
+        assert(path[0] == goalConfig);
+        for (uint i = 1; i < path.size(); i++)
         {
-            if (!CheckCollision(config))
+            if (!CheckCollision(path[i]))
             {
-                nodeptr_t nodeptr = std::make_shared<Node>(config, UNVISITED);
+                nodeptr_t nodeptr = std::make_shared<Node>(path[i], UNVISITED);
                 total.push_back(nodeptr);
                 nodesAdded++;
             }
@@ -690,10 +693,24 @@ bool FMT::FindPath(const path_t & region)
     return true;
 }
 
-path_t FMT::BuildPath()
+path_t FMT::BuildPath(path_t &oldPath)
 {
     path_t path;
     nodeptr_t currNode = goalNode;
+
+    // Start from old path and join until current goalNode
+    for (uint i = 0; i < oldPath.size(); ++i)
+    {
+        if (oldPath[i] != currNode->q)
+        {
+            path.push_back(oldPath[i]);
+        }
+        else
+        {
+            // Configurations are the same
+            break;
+        }
+    }
 
     // Don't add start location to path
     while (currNode->parent.get())
@@ -702,8 +719,8 @@ path_t FMT::BuildPath()
         currNode = currNode->parent;
     }
 
-    /*
-    std::ofstream outFile("path.txt");
+    std::ofstream outFile("path.txt", std::ios::app);
+    outFile << "Building Path:\n" << std::endl;
     if (outFile.is_open())
     {
         for (const auto &loc : path)
@@ -715,8 +732,9 @@ path_t FMT::BuildPath()
     {
         std::cout << "Something went wrong opening the path.txt file :( " << std::endl;
     }
+    outFile << "\n\n" << std::endl;
     outFile.close();
-    */
+
     return path;
 }
 
