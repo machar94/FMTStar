@@ -18,7 +18,7 @@
 
 using namespace OpenRAVE;
 
-static std::vector<double> weights = {0.1, 1.0, 1.0};
+static std::vector<double> weights = {0.1, 0.1, 1.0, 1.0};
 
 class FMT : public ModuleBase
 {

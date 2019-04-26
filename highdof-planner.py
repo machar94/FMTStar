@@ -11,7 +11,7 @@ import math
 
 ##### Parameters #####
 WORLD    = [-8.4, 8.4, -2.4, 2.4] # Position
-SAMPLES  = 2000 
+SAMPLES  = 4000 
 RADIUS   = 0.5
 STEPSIZE = 0.1
 SEED     = 1
@@ -19,7 +19,7 @@ PLANNER  = "smart"
 FWD_COLLISION_CHECK = 1
 # TRIGGER1 = "2.0 Table3 3.1 0.1 90 Table4 4.2 0.0 0"
 # TRIGGER2 = "-2.0 Table1 -0.3 0.7 90 Table2 0.5 -1.2 0 "
-GOAL_CONFIG  = [math.radians(-90), 7.0, 2.3]
+GOAL_CONFIG  = [math.radians(-90), math.radians(90), 7.0, 2.3]
 FILENAME = "stats.txt"
 
 if not __openravepy_build_doc__:
@@ -89,11 +89,11 @@ if __name__ == "__main__":
 
     # The active DOF are translation in X and Y and rotation about the Z axis of the base of the robot.
     # robot.SetActiveDOFs([],DOFAffine.X|DOFAffine.Y|DOFAffine.RotationAxis,[0,0,1])
-    jointnames = ['r_shoulder_pan_joint']
+    jointnames = ['r_shoulder_pan_joint', 'l_shoulder_pan_joint']
     jointindices = [robot.GetJoint(name).GetDOFIndex() for name in jointnames]
-    # print(jointindices)
+    print(jointindices)
     robot.SetActiveDOFs(jointindices,DOFAffine.X|DOFAffine.Y)
-    startConfig = [math.radians(-90), -8.4, -2.4] # r_shoulder, x, y
+    startConfig = [math.radians(-90), math.radians(90), -8.4, -2.4] # r_shoulder, x, y
     robot.SetActiveDOFValues(startConfig)
     robot.GetController().SetDesired(robot.GetDOFValues())
     waitrobot(robot)
@@ -110,9 +110,12 @@ if __name__ == "__main__":
     startConfigStr = ' '.join([str(e) for e in startConfig])
 
     # first 0, 1 are lower and upper limits
-    # second 0 are the limits or r_shoulder
+    # second 0 are the limits or r_shoulder_pan
+    # third 1 are the limits of l_shoulder_pan
     WORLD.insert(0, robot.GetActiveDOFLimits()[0][0])
     WORLD.insert(1, robot.GetActiveDOFLimits()[1][0])
+    WORLD.insert(2, robot.GetActiveDOFLimits()[0][1])
+    WORLD.insert(3, robot.GetActiveDOFLimits()[1][1])
     worldStr       = ' '.join([str(e) for e in WORLD])
     
     goalConfigStr  = ' '.join([str(e) for e in GOAL_CONFIG])
@@ -133,6 +136,8 @@ if __name__ == "__main__":
         FMTPlanner.SendCommand('PrintClass')
         # FMTPlanner.SendCommand('Run')
     result = FMTPlanner.SendCommand('RunWithReplan')
+
+    # IPython.embed()
 
     waitrobot(robot)
 
