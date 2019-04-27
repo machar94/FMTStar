@@ -137,7 +137,7 @@ class FMT : public ModuleBase
 
     bool FindPath(const path_t & region);
 
-    path_t BuildPath(path_t &oldpath);
+    path_t BuildPath(path_t &oldpath, std::ostream &sout);
 
     void PlotPath(const float color[4], path_t &path);
 
@@ -437,7 +437,7 @@ bool FMT::Run(std::ostream &sout, std::istream &sinput)
 
     FindPath(path);
 
-    path = BuildPath(path);
+    path = BuildPath(path, sout);
     std::cout << "OpenSet: " << open.size() << std::endl;
     PlotSet(colors.GetColor(), total, CLOSED);
     PlotSet(colors.GetColor(), total, UNVISITED);
@@ -458,20 +458,27 @@ bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
     robot->SetActiveDOFValues(startConfig);
     config_t currConfig = startConfig;
     path_t path(1, goalConfig); // Goal region includes only goal config originally
+    neighborTable.clear();
 
-    // TestTriggers();
+    TestTriggers();
 
     bool reachedGoal = false;
     while (reachedGoal == false)
     {
         auto begin = std::chrono::high_resolution_clock::now();
         SetupSets(currConfig, path, sout);
-        printVector(currConfig);
-        TestSetSizes();
-        bool foundPath = FindPath(path);
         auto end = std::chrono::high_resolution_clock::now();
         auto dur = end - begin; 
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();        
+        sout << ms << " ";
+
+        // printVector(currConfig);
+        // TestSetSizes();
+        begin = std::chrono::high_resolution_clock::now();
+        bool foundPath = FindPath(path);
+        end = std::chrono::high_resolution_clock::now();
+        dur = end - begin; 
+        ms = std::chrono::duration_cast<std::chrono::milliseconds>(dur).count();        
         sout << ms << " ";
 
         if (!foundPath)
@@ -480,10 +487,11 @@ bool FMT::RunWithReplan(std::ostream &sout, std::istream &sinput)
             // PlotSet(colors.GetColor(), total, CLOSED);
             // PlotSet(colors.GetColor(), total, UNVISITED);
             std::cout << "Unable to find a path!" << std::endl;
+            triggers.clear();
             break;
         }
 
-        path = BuildPath(path);
+        path = BuildPath(path, sout);
         //origPathLength = PathLength(path);
         PlotPath(colors.GetColor(), path);
 
@@ -530,8 +538,8 @@ void FMT::GenerateSamples(const path_t &path, std::ostream &sout)
             }
         }
         std::cout << "\n\nStarted off with " << total.size() << " nodes from previous path" << std::endl;
-        sout << total.size() << " ";
     }
+    sout << total.size() << " ";
 
     
     // Generate N-2 random samples in configuration space and add to the
@@ -711,7 +719,7 @@ bool FMT::FindPath(const path_t & region)
     return true;
 }
 
-path_t FMT::BuildPath(path_t &oldPath)
+path_t FMT::BuildPath(path_t &oldPath, std::ostream &sout)
 {
     path_t path;
     nodeptr_t currNode = goalNode;
@@ -731,12 +739,16 @@ path_t FMT::BuildPath(path_t &oldPath)
     }
 
     // Don't add start location to path
+    int nodesInPath = 0;
     while (currNode->parent.get())
     {
         path.push_back(currNode->q);
         currNode = currNode->parent;
+        nodesInPath++;
     }
+    sout << nodesInPath << " ";
 
+    /*
     std::ofstream outFile("path.txt", std::ios::app);
     outFile << "Building Path:\n" << std::endl;
     if (outFile.is_open())
@@ -752,6 +764,7 @@ path_t FMT::BuildPath(path_t &oldPath)
     }
     outFile << "\n\n" << std::endl;
     outFile.close();
+    */
 
     return path;
 }
@@ -780,8 +793,8 @@ void FMT::ExecuteTrajectory(path_t &path, config_t &startCfg)
         traj->Insert(i, *it);
         i++;
     }
-    std::vector<double> maxVel(3, 1.0);
-    std::vector<double> maxAcc(3, 2.0);
+    std::vector<double> maxVel(4, 1.0);
+    std::vector<double> maxAcc(4, 2.0);
     OpenRAVE::planningutils::RetimeAffineTrajectory(traj, maxVel, maxAcc);
     robot->GetController()->SetPath(traj);
 
@@ -878,7 +891,7 @@ bool FMT::ExecuteMultiThreadTraj(path_t &path, config_t &startCfg)
         {
             return reachedGoal;
         }
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        // std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
         // Step 3. Execute trajectory that was validated to be free
         // Send in small path in reverse to execute trajectory since it uses reverse iterators
@@ -909,8 +922,8 @@ void FMT::CheckTriggers(const config_t &currPos)
         return;
     }
 
-    // currPos[0] <- x-coord
-    if (currPos[0] > triggers.back()->triggerPoint)
+    // currPos[dim-2] <- x-coord
+    if (currPos[dim-2] > triggers.back()->triggerPoint)
     {
         // Update environment
         for (const auto &dynobj : triggers.back()->dynobjs)
